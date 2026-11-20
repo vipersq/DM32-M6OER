@@ -5,6 +5,7 @@
 #include <string.h>
 #include "board.h"
 #include "ui_screens.h"
+#include "splash_logo.h"
 #include "fmt.h"
 #include "i18n.h"
 #include "ui_svc.h"
@@ -856,8 +857,74 @@ static int draw_wordmark(const font_t *f, int y)
 	return f->h;
 }
 
+// The callsign under the boot picture (ui_set_splash_call)
+static char splash_call[16];
+
+void ui_set_splash_call(const char *call)
+{
+	str_copy(splash_call, sizeof splash_call, call != NULL ? call : "");
+}
+
+// The boot picture (tools/splash_logo.py) with the callsign under it, on a display with room for it (a color one):
+// false where it doesn't fit, for the drawn mark and name instead
+static bool draw_logo_splash(const char *board_name, const char *version, const char *line1, const char *line2)
+{
+	int w = gfx_width(), h = gfx_height();
+	const ui_layout_t *L = &ui_layout;
+	const int n = SPLASH_LOGO_SIZE;
+	if (gfx_bpp() == 1 || w < n + 8 || h < n + L->large->h + 2 * L->small->h + L->tiny->h + 12)
+		return false;
+	gfx_clear(RGB565(0, 0, 0));
+	const color_t red = RGB565(220, 24, 24), grey = splash_logo_palette[1];
+	const font_t *ff = L->tiny;
+	char foot[48];
+	sbuf_t b;
+	sb_init(&b, foot, sizeof foot);
+	sb_str(&b, "C4FMFoundry  ");
+	sb_str(&b, board_name);
+	sb_str(&b, "  ");
+	sb_str(&b, version);
+	if (gfx_text_width(ff, foot) > w) {
+		sb_init(&b, foot, sizeof foot);
+		sb_str(&b, "C4FMFoundry ");
+		sb_str(&b, version);
+	}
+	int foot_y = h - ff->h - 2;
+	const font_t *cf = splash_call[0] != '\0' ? L->large : NULL;
+	const char *lines[2] = { line1 != NULL ? line1 : "", line2 != NULL ? line2 : "" };
+	const font_t *lf = L->small;
+	int text_h = (cf != NULL ? cf->h + 4 : 0) + ((lines[0][0] != '\0') + (lines[1][0] != '\0')) * lf->h;
+	int y = (foot_y - n - 6 - text_h) / 2;
+	if (y < 0)
+		y = 0;
+	int x0 = (w - n) / 2;
+	for (int py = 0; py < n; py++) {
+		const uint8_t *row = &splash_logo_pixels[py * n / 2];
+		for (int px = 0; px < n; px++) {
+			uint8_t i = (uint8_t)(px & 1 ? row[px / 2] & 0x0Fu : row[px / 2] >> 4);
+			if (i != 0)	// 0 is black: cleared already
+				gfx_pixel(x0 + px, y + py, splash_logo_palette[i]);
+		}
+	}
+	y += n + 6;
+	if (cf != NULL) {
+		gfx_text(cf, (w - gfx_text_width(cf, splash_call)) / 2, y, splash_call, red);
+		y += cf->h + 4;
+	}
+	for (int i = 0; i < 2; i++) {
+		if (lines[i][0] == '\0')
+			continue;
+		gfx_text(lf, (w - gfx_text_width(lf, lines[i])) / 2, y, lines[i], RGB565(255, 255, 255));
+		y += lf->h;
+	}
+	gfx_text(ff, (w - gfx_text_width(ff, foot)) / 2, foot_y, foot, grey);
+	return true;
+}
+
 void ui_draw_splash(const char *board_name, const char *version, const char *line1, const char *line2)
 {
+	if (draw_logo_splash(board_name, version, line1, line2))
+		return;
 	int w = gfx_width(), h = gfx_height();
 	const ui_layout_t *L = &ui_layout;
 	gfx_clear(ui_col.bg);

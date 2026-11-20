@@ -98,7 +98,7 @@ static uint16_t hub_count(void) { return HUBC_COUNT; }
 
 static void hub_item(uint16_t i, ui_item_t *it)
 {
-	static const char *const names[] = { NULL, TRN(TITLE_ZONES, "Zones"), TRN(TITLE_CHANNELS, "Channels"), TRN(THIS_CHANNEL_2, "This channel"), TRN(CALLS_2, "Calls"),
+	static const tr_id_t names[] = { TR_NONE, TRN(TITLE_ZONES, "Zones"), TRN(TITLE_CHANNELS, "Channels"), TRN(THIS_CHANNEL_2, "This channel"), TRN(CALLS_2, "Calls"),
 					     TRN(WIRES_X_2, "Wires-X"), TRN(TITLE_TOOLS, "Tools"), TRN(TITLE_SETTINGS, "Settings") };
 	const radio_view_t *v = ui_view();
 	if (i == HUBC_VFO) {
@@ -6797,7 +6797,7 @@ static const set_item_t s_sound[] = {
 #if CONFIG_SIG_TONES
 // Settings > Signaling tones: where each event sounds, then a row per event that opens its chain's steps (SCR_SIG_CHAIN:
 // a step is a frequency and a length; a step of 0 ms ends the chain and no step is the event's standard sound)
-static const set_item_t s_sigtones[] = {
+static const set_item_t s_sigtones[] __attribute__((unused)) = {
 #if CONFIG_DMR
 	LIST(TRN(SIG_ROW_DMR_START_TONE, "DMR start tone"), "talk permit roger signaling", UI_SET_SIG_DMR + SIG_EV_BEGIN, v_sigout, n_sigout),
 	LIST(TRN(SIG_ROW_DMR_END_TONE, "DMR end tone"), "roger signaling", UI_SET_SIG_DMR + SIG_EV_END, v_sigout, n_sigout),
@@ -6996,10 +6996,10 @@ static const set_item_t s_my_radio[] = {
 // The mode menus (docs/spec/c4fm.md 6): Menu > FM / DMR / C4FM open these pages, Settings keeps what all modes share.
 // A page's ACTION rows open the mode's screens and sub-pages
 static const int16_t v_bcl[] = { RADIO_BCL_OFF, RADIO_BCL_CARRIER, RADIO_BCL_WRONG_TONE };
-static const char *const n_bcl[] = { TRN(VALUE_OFF, "Off"), TRN(CARRIER, "Carrier"), TRN(WRONG_TONE, "Wrong tone") };
+static const tr_id_t n_bcl[] = { TRN(VALUE_OFF, "Off"), TRN(CARRIER, "Carrier"), TRN(WRONG_TONE, "Wrong tone") };
 // The roger sound, every mode (radio/roger_sound.h): Off, then the sounds in roger_sound_t order (value = sound + 1)
 static const int16_t v_roger[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
-static const char *const n_roger[] = { TRN(VALUE_OFF, "Off"), TRN(CLASSIC, "Classic"), TRN(BEEP, "Beep"), TRN(DOUBLE_BEEP, "Double beep"),
+static const tr_id_t n_roger[] = { TRN(VALUE_OFF, "Off"), TRN(CLASSIC, "Classic"), TRN(BEEP, "Beep"), TRN(DOUBLE_BEEP, "Double beep"),
 	TRN(TWO_TONE_UP, "Two-tone up"), TRN(TWO_TONE_DOWN, "Two-tone down"), TRN(TRIPLE_CHIRP, "Triple chirp"), TRN(SWEEP_UP, "Sweep up"), TRN(SWEEP_DOWN, "Sweep down"),
 	TRN(BEE_BOO, "Bee-boo"), TRN(MORSE_K, "Morse K"), TRN(MORSE_R, "Morse R"), TRN(QUINDAR, "Quindar") };
 _Static_assert(sizeof v_roger / sizeof v_roger[0] == ROGER_COUNT + 1u, "Off and each roger sound");
@@ -7059,11 +7059,12 @@ static const set_item_t s_advanced[] = {
 // Settings > Tactical: the red screen and its own backlight, dark LEDs, and the tactical tones (each on its own, all off
 // by default; settings_t.tac_ui / tac_bright, radio_settings_t.tac_* / leds_off)
 static const int16_t v_tac_bright[] = { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
-static const char *const n_tac_bright[] = { TRN(NORMAL, "Normal"), "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%",
-	"90%", "100%" };
+static const tr_id_t n_tac_bright[] = { TRN(NORMAL, "Normal"), TRX(VALUE_10_PCT, "10%"), TRX(VALUE_20_PCT, "20%"),
+	TRX(VALUE_30_PCT, "30%"), TRX(VALUE_40_PCT, "40%"), TRX(VALUE_50_PCT, "50%"), TRX(VALUE_60_PCT, "60%"),
+	TRX(VALUE_70_PCT, "70%"), TRX(VALUE_80_PCT, "80%"), TRX(VALUE_90_PCT, "90%"), TRX(VALUE_100_PCT, "100%") };
 // The tactical tones' styles (beep.h BEEP_TAC_STYLES): a change plays the key-up tone in the new one
 static const int16_t v_tac_style[] = { 0, 1, 2, 3, 4 };
-static const char *const n_tac_style[] = { TRN(DEEP, "Deep"), TRN(BLOOP, "Bloop"), TRN(LOW_CHIRP, "Low chirp"), TRN(HIGH_CHIRP, "High chirp"),
+static const tr_id_t n_tac_style[] = { TRN(DEEP, "Deep"), TRN(BLOOP, "Bloop"), TRN(LOW_CHIRP, "Low chirp"), TRN(HIGH_CHIRP, "High chirp"),
 	TRN(HARRIS_LIKE, "Harris-like") };
 static const set_item_t s_tactical[] = {
 	TOGGLE(TRN(EVERYTHING_TACTICAL, "Everything tactical"), "tactical all at once red LEDs tones", UI_SET_TAC_ALL),

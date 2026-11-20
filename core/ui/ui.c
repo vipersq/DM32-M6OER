@@ -34,7 +34,7 @@
 // Every word here is RAM on all radios: raise it only by what the check shows
 #define UI_TASK_STACK_WORDS	504
 
-#define SPLASH_MS		1000
+#define SPLASH_MS		1800	// long enough to see the boot picture
 #define FRAME_MIN_MS		50	// at most 20 redraws a second
 // Keys still waiting put a redraw off, so a burst of keys costs one: a changed list repaints most of a large panel
 // (a full frame of a 240x320 panel driven a byte at a time is near 0.2 s). Not longer than this, so the screen keeps
@@ -112,6 +112,21 @@ static void ui_task(void *arg)
 		ui_layout_init();
 		char line1[17], line2[17];
 		ui_svc_boot_text(line1, line2);
+		// The callsign under the boot picture: the C4FM one, else the radio name's first word
+		char call[17] = "";
+#if CONFIG_C4FM
+		ui_svc_c4fm_call_get(call, sizeof call);
+#endif
+		if (call[0] == '\0') {
+			ui_svc_name_get(UI_NAME_RADIO, call);
+			for (char *c = call; *c != '\0'; c++) {
+				if (*c == ' ') {
+					*c = '\0';
+					break;
+				}
+			}
+		}
+		ui_set_splash_call(call);
 		// the release name when this is one (v26.11), else the commit
 		gfx_frame_begin();
 		ui_draw_splash(board.name, RFOUNDRY_RELEASE[0] != '\0' ? RFOUNDRY_RELEASE : RFOUNDRY_GIT, line1, line2);

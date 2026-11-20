@@ -245,6 +245,8 @@ bool ui_list_body_fits(const ui_state_t *s, const ui_list_t *l);
 
 // The boot screen: the mark, the name, the owner's two boot text lines (empty: left out), board and version
 void ui_draw_splash(const char *board_name, const char *version, const char *line1, const char *line2);
+// The callsign the boot screen shows under its picture ("" none): the UI task sets it before drawing it
+void ui_set_splash_call(const char *call);
 void ui_draw_home(const radio_view_t *v, const ui_state_t *s);
 #if CONFIG_DUAL_WATCH
 // Home while dual watch runs: both channels, each with its frequency, which one PTT uses (PTT) and which one a call is

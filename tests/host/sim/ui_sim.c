@@ -3419,6 +3419,7 @@ static bool run_token(char *t, char *err, size_t len)
 		}
 		char l1[17], l2[17];
 		ui_svc_boot_text(l1, l2);
+		ui_set_splash_call("M6OER");	// the UI task's: the C4FM callsign, else the radio name's first word
 		ui_draw_splash(board.name, "a1b2c3d4", l1, l2);
 		return true;
 	}
