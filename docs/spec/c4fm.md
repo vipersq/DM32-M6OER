@@ -340,3 +340,18 @@ tone chains (`CONFIG_SIG_TONES=n`: one or the other drives the encoder's tone in
 Settings > Roger & tones has Tones in P25 and Tones in NXDN; `settings_t.tac_modes` and `roger_modes` are a bit per
 `radio_mode_t` each. A settings record from the fork before this (its fields at bytes 395-423) loads with every field
 where it is now (settings.c `fork_record_move`); the stored power levels go back to the defaults once.
+
+## Quick pages, DMR receive, mic gain, dual watch
+
+- Quick (`ui_quick_pages`): # turns pages. FM, C4FM, P25 and NXDN have two, DMR three. The mode's own page comes
+  first; C4FM's has DG-ID, P25 and NXDN's voice volume. DMR's second page is receive: Both slots, Any TG, Any CC,
+  RX TG, digital monitor, Talk to, voice volume, slot. The last page is sound and tactical: roger, tactical tones, red
+  screen, mic, tone style, the reception end tone, LEDs. Tile 4 stays Mode (Copy to VFO on a channel).
+- DMR receive (`radio_settings_t.dmr_rx`, `dmr_rx_tg`; `settings_t.dmr_rx`, `dmr_rx_tg[3]`): both timeslots (the
+  first call heard plays until it ends: one vocoder), every talkgroup, any color code, each on top of the channel and
+  the digital monitor; and one talkgroup heard on every DMR channel (the stack's `group_ok`). Home shows "TS1+2" and
+  "CC1*"; a call shows its slot, its color code where it isn't the channel's, and its talkgroup. PTT stays on the
+  channel's slot, color code and talk target. Also in Settings > Modes.
+- Mic gain: the DM-32 now takes Settings > Mic gain in FM too (`hal_radio_t.mic_gain`), and starts 5 dB (FM) and
+  3 dB (digital) above the old fixed level.
+- Dual watch is on in the C4FM variant (Quick tile 7); the UI stack grows by 320 bytes and the RTOS heap by 2 KB.

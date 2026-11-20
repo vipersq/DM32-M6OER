@@ -39,7 +39,7 @@ CONFIG_SNMP ?= n
 # frequency in FM, C4FM on C4FM channels; C4FM first, platform/hrc7000/fm_rx_audio.h)
 
 # Receivers and extras this proof of concept leaves out
-CONFIG_DUAL_WATCH ?= n
+# Dual watch on (Quick tile 7): two channels on the one receiver, the second looked at between
 CONFIG_AM_RX ?= n
 CONFIG_BCAST_FM ?= n
 CONFIG_LANG_ES ?= n

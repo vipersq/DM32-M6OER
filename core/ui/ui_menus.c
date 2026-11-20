@@ -7116,7 +7116,7 @@ static const set_item_t s_calls[] = {
 // Settings > Talk & voice: transmitting and the digital voice, every mode
 static const set_item_t s_talk_voice[] = {
 	LIST(TRN(SET_LABEL_TX_TIMEOUT, "TX timeout"), "TOT", UI_SET_TOT_S, v_tot, n_tot),
-	NUMBER(TRN(SET_LABEL_MIC_GAIN, "Mic gain"), "microphone DMR C4FM", UI_SET_MIC_GAIN, 0, 10, 1, NULL),
+	NUMBER(TRN(SET_LABEL_MIC_GAIN, "Mic gain"), "microphone FM DMR C4FM loudness", UI_SET_MIC_GAIN, 0, 10, 1, NULL),
 	TOGGLE(TRN(SET_LABEL_MIC_AGC, "Mic AGC"), "automatic gain level DMR C4FM", UI_SET_MIC_AGC),
 	TOGGLE(TRN(SET_LABEL_MIC_NOISE_REDUCTION, "Mic noise reduction"), "noise suppression background DMR C4FM", UI_SET_NOISE_REDUCTION),
 	NUMBER(TRN(VOICE_VOLUME, "Voice volume"), "DMR C4FM digital decoded voice level", UI_SET_VOICE_RX_GAIN, -6, 12, 2, " dB"),
@@ -7132,6 +7132,9 @@ static const set_item_t s_modes[] = {
 	LIST(TRN(FM_BUSY_LOCKOUT, "FM busy lockout"), "FM BCL busy channel lockout", UI_SET_FM_BCL, v_bcl, n_bcl),
 	NUMBER(TRN(DMR_REPLY_WINDOW, "DMR reply window"), "DMR", UI_SET_REPLY_S, 0, 30, 1, " s"),
 	TOGGLE(TRN(DMR_MONITOR, "DMR monitor"), "DMR digital monitor promiscuous hear all by default", UI_SET_HEAR_ALL_DEFAULT),
+	TOGGLE(TRN(DMR_BOTH_SLOTS, "DMR both slots"), "DMR timeslot TS1 TS2 dual slot two talkgroups repeater", UI_SET_DMR_BOTH_TS),
+	TOGGLE(TRN(DMR_ANY_TALKGROUP, "DMR any talkgroup"), "DMR promiscuous all TG hear every group", UI_SET_DMR_ANY_TG),
+	TOGGLE(TRN(DMR_ANY_COLOR_CODE, "DMR any color code"), "DMR promiscuous all CC", UI_SET_DMR_ANY_CC),
 	TOGGLE(TRN(DMR_TALKER_ALIAS, "DMR talker alias"), "DMR show talker alias", UI_SET_ALIAS_SHOW),
 	ACTION(TRN(DMR_DATA_AND_MESSAGES, "DMR data and messages"), "DMR radio check call alert SMS format", SA_DMR_DATA),
 	NUMBER(TRN(C4FM_TX_DEVIATION, "C4FM TX deviation"), "C4FM modulation level", UI_SET_C4FM_TX_LEVEL, 70, 130, 5, "%"),

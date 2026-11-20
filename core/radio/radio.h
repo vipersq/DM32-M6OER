@@ -59,6 +59,10 @@ typedef struct {
 	bool tac_rxend;		// a tone when a reception has ended
 	uint8_t tac_tones_off;	// bit (1 << radio_mode_t): the tactical tones off on channels of that mode
 	uint8_t roger_off;	// bit (1 << radio_mode_t): the roger sound off on channels of that mode
+	// DMR receive (Quick, Settings > Modes): RADIO_DMR_RX_* always on, besides what the channel and the digital
+	// monitor ask for; and one talkgroup heard on every DMR channel besides its listen list (0 = none)
+	uint8_t dmr_rx;
+	uint32_t dmr_rx_tg;
 	bool tx_inhibit;	// refuse every transmission
 	// Scan (CONFIG_SCAN)
 	uint8_t scan_resume;	// scan_resume_t (radio/scan.h): 0 time, 1 carrier, 2 stop
@@ -116,6 +120,11 @@ typedef struct {
 // Americas), or every 100 kHz. Either way a frequency typed in may be any 100 kHz point
 #define RADIO_BCAST_STEP_200_ODD	0u
 #define RADIO_BCAST_STEP_100		1u
+
+// radio_settings_t.dmr_rx
+#define RADIO_DMR_RX_BOTH_TS	0x01u	// both timeslots of a repeater: the first call heard plays until it ends
+#define RADIO_DMR_RX_ANY_TG	0x02u	// every talkgroup (and private calls between others)
+#define RADIO_DMR_RX_ANY_CC	0x04u	// any color code
 
 #define RADIO_REPLY_CODEPLUG	0xFFu	// radio_settings_t.reply_s: the codeplug's hang times (else the stack's 10 s)
 // radio_settings_t.dual_delay_ms: the default and the most. In the wait the receiver looks at the other channel for a
@@ -185,6 +194,7 @@ typedef struct {
 	bool gps_tx_channel;	// the channel's codeplug setting asks for our position in its calls (CONFIG_DMR_GPS)
 	bool hear_all;		// every talkgroup on our slot: MONITOR held, or the hear all latch
 	bool hear_all_latch;	// hear all latched (radio_req_dmr_hear_all), until the channel changes
+	bool both_ts, any_cc;	// either timeslot heard, any color code (the digital monitor, or radio_settings_t.dmr_rx)
 	uint32_t focus_id;	// the focused row's target (radio_req_dmr_focus), 0 = none: PTT talks to it once
 	// The channel's SFR role (CONFIG_SFR, docs/spec/sfr.md 4): sfrRole_t, 0 none. A repeater role runs instead of the
 	// call stack (active false): sfr_rpt, with its outbound slot keyed (sfr_keyed) and an inbound call (sfr_busy)

@@ -11,6 +11,11 @@
 // tests/hil/test_task_stacks.py asks for, and gives the rest to main RAM (the air MTU's 64-burst lists took the last
 // 1 KB from 34, the talk permit before keying 0.5 KB from 33). The debug link's tasks view reports the least free since
 // start (tasks.heap_min_free)
+#if defined(CONFIG_C4FM) && CONFIG_C4FM
+// The C4FM build: its C4FM task and the larger UI stack (dual watch) add about 2 KB: the same spare kept
+#define configTOTAL_HEAP_SIZE	(34 * 1024 + 512)
+#else
 #define configTOTAL_HEAP_SIZE	(32 * 1024 + 512)
+#endif
 
 #endif

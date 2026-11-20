@@ -390,6 +390,16 @@ msgid "Color code: not in this build"
 msgstr "色码：本版本无"
 
 #: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_RX_TG_OFF"
+msgid "RX TG off"
+msgstr ""
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_RX_TG"
+msgid "Also hearing TG "
+msgstr ""
+
+#: core/ui/ui_app.c
 msgctxt "QUICK_WHY_FM_ONLY_DMR_CHANNEL"
 msgid "FM only: this is a DMR channel"
 msgstr "仅 FM：这是 DMR 信道"
@@ -423,6 +433,26 @@ msgstr "VFO：本版本仅一种模式"
 msgctxt "WHY_VOX_NOT_ON_RADIO_YET"
 msgid "VOX: not on this radio yet"
 msgstr "VOX：本机尚未支持"
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_WHY_ROGER_MODES"
+msgid "Roger: FM, DMR and C4FM"
+msgstr ""
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_WHY_VOICE_DIGITAL"
+msgid "Voice volume: digital modes"
+msgstr ""
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_WHY_DGID_C4FM"
+msgid "DG-ID: a C4FM channel"
+msgstr ""
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_WHY_DMR_ONLY"
+msgid "DMR only"
+msgstr ""
 
 #: core/ui/ui_app.c
 msgctxt "QUICK_TOAST_BANDWIDTH_25_KHZ"
@@ -498,6 +528,61 @@ msgstr "无密钥：在设置 > 加密 中设置"
 msgctxt "QUICK_TOAST_POWER"
 msgid "Power "
 msgstr "功率 "
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_ROGER_OFF"
+msgid "Roger off"
+msgstr ""
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_ROGER_ON"
+msgid "Roger on"
+msgstr ""
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_TONES_ON"
+msgid "Tactical tones on"
+msgstr ""
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_TONES_OFF"
+msgid "Tactical tones off"
+msgstr ""
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_BOTH_SLOTS_ON"
+msgid "Both slots: first call plays"
+msgstr ""
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_BOTH_SLOTS_OFF"
+msgid "Channel's slot only"
+msgstr ""
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_ANY_TG_ON"
+msgid "Every talkgroup heard"
+msgstr ""
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_ANY_TG_OFF"
+msgid "Listen list only"
+msgstr ""
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_ANY_CC_ON"
+msgid "Any color code heard"
+msgstr ""
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_ANY_CC_OFF"
+msgid "Channel's color code only"
+msgstr ""
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_RX_TG_KEYS"
+msgid "Type the TG, 0 none, OK sets"
+msgstr ""
 
 #: core/ui/ui_app.c
 msgctxt "QUICK_TOAST_ALL_DIGITS_TYPED"
@@ -4400,6 +4485,21 @@ msgid "DMR monitor"
 msgstr ""
 
 #: core/ui/ui_menus.c
+msgctxt "DMR_BOTH_SLOTS"
+msgid "DMR both slots"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "DMR_ANY_TALKGROUP"
+msgid "DMR any talkgroup"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "DMR_ANY_COLOR_CODE"
+msgid "DMR any color code"
+msgstr ""
+
+#: core/ui/ui_menus.c
 msgctxt "DMR_TALKER_ALIAS"
 msgid "DMR talker alias"
 msgstr ""
@@ -5820,6 +5920,61 @@ msgid "{TX freq|TXFreq}"
 msgstr "{发射频率|发频}"
 
 #: core/ui/ui_screens.c
+msgctxt "QUICK_LABEL_ROGER"
+msgid "Roger"
+msgstr ""
+
+#: core/ui/ui_screens.c
+msgctxt "QUICK_LABEL_TONES"
+msgid "Tones"
+msgstr ""
+
+#: core/ui/ui_screens.c
+msgctxt "QUICK_LABEL_TACTICAL"
+msgid "{Tactical|Tac}"
+msgstr ""
+
+#: core/ui/ui_screens.c
+msgctxt "QUICK_LABEL_MIC"
+msgid "Mic"
+msgstr ""
+
+#: core/ui/ui_screens.c
+msgctxt "QUICK_LABEL_STYLE"
+msgid "Style"
+msgstr ""
+
+#: core/ui/ui_screens.c
+msgctxt "QUICK_LABEL_RX_END"
+msgid "{RX end|RXend}"
+msgstr ""
+
+#: core/ui/ui_screens.c
+msgctxt "QUICK_LABEL_VOICE"
+msgid "Voice"
+msgstr ""
+
+#: core/ui/ui_screens.c
+msgctxt "QUICK_LABEL_BOTH_SLOTS"
+msgid "{Both slots|2 TS}"
+msgstr ""
+
+#: core/ui/ui_screens.c
+msgctxt "QUICK_LABEL_ANY_TG"
+msgid "{Any TG|AnyTG}"
+msgstr ""
+
+#: core/ui/ui_screens.c
+msgctxt "QUICK_LABEL_ANY_CC"
+msgid "{Any CC|AnyCC}"
+msgstr ""
+
+#: core/ui/ui_screens.c
+msgctxt "QUICK_LABEL_RX_TG"
+msgid "{RX TG|RXTG}"
+msgstr ""
+
+#: core/ui/ui_screens.c
 msgctxt "QUICK_LABEL_TONE_TX"
 msgid "Tone TX"
 msgstr "发射亚音"
@@ -5858,6 +6013,11 @@ msgstr "快捷"
 msgctxt "QUICK_HINT"
 msgid "1-9 change  Hold OK save"
 msgstr "1-9 更改  长按 OK 保存"
+
+#: core/ui/ui_screens.c
+msgctxt "QUICK_HINT_PAGES"
+msgid "# Next page  0 All settings"
+msgstr ""
 
 #: core/ui/ui_screens.c
 msgctxt "QUICK_HINT_ALL_SETTINGS"

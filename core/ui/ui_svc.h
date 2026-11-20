@@ -459,6 +459,11 @@ typedef enum {
 	UI_SET_TAC_MODE,
 	UI_SET_TAC_BRIGHT,
 	UI_SET_TAC_ALL,		// Settings > Tactical > Everything tactical: the red screen, LEDs off and the three tones at once
+	// DMR receive (radio_settings_t.dmr_rx; Quick's DMR page, Settings > Modes): both timeslots, every talkgroup, any
+	// color code; 1 on
+	UI_SET_DMR_BOTH_TS,
+	UI_SET_DMR_ANY_TG,
+	UI_SET_DMR_ANY_CC,
 	UI_SET_COUNT
 } ui_setting_t;
 
@@ -491,6 +496,9 @@ int32_t ui_svc_fm_get(uint8_t id);
 void ui_svc_fm_set(uint8_t id, int32_t value);
 // The C4FM callsign setting (settings_t.c4fm_call; "" = the radio name's first word)
 void ui_svc_c4fm_call_get(char *out, uint8_t len);
+// The extra DMR RX talkgroup (radio_settings_t.dmr_rx_tg), 0 = none; heard on every DMR channel
+uint32_t ui_svc_dmr_rx_tg(void);
+void ui_svc_dmr_set_rx_tg(uint32_t tg);
 void ui_svc_c4fm_call_set(const char *call);
 #endif
 bool ui_svc_setting_set(uint8_t id, int32_t value);

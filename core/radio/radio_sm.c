@@ -95,7 +95,9 @@ static void cw_cancel(radio_sm_t *sm);
 #endif
 
 static bool tones_here(const radio_sm_t *sm);	// Settings > Roger & tones, per mode (below)
-static bool roger_here(const radio_sm_t *sm) __attribute__((unused));	// not with CONFIG_SIG_TONES (its chains)
+#if !CONFIG_SIG_TONES
+static bool roger_here(const radio_sm_t *sm);
+#endif
 
 // The radio's own DMR ID when the codeplug's general settings hold none (build value; 0 = refuse DMR transmit)
 #ifndef RADIO_DMR_ID_DEFAULT
@@ -1532,6 +1534,13 @@ static bool hear_all_on(const radio_sm_t *sm)
 	return sm->hear_all_latch;
 }
 
+// The extra RX talkgroup (radio_settings_t.dmr_rx_tg): heard on every DMR channel, whatever its listen list
+static bool rx_tg_ok(uint32_t tg, void *ctx)
+{
+	const radio_sm_t *sm = ctx;
+	return sm->set.dmr_rx_tg != 0 && tg == sm->set.dmr_rx_tg;
+}
+
 static void dmr_configure(radio_sm_t *sm)
 {
 	const channel_t *ch = &sm->view.ch;
@@ -1564,8 +1573,16 @@ static void dmr_configure(radio_sm_t *sm)
 	cfg.listen.hear_all = sm->view.monitor || hear_all_on(sm);
 	// Digital monitor hears everything on the frequency: any color code, either timeslot (dmr-voice.md 1)
 	cfg.listen.any_cc = cfg.listen.both_ts = cfg.listen.hear_all;
+	// The radio's own receive options on top (Quick, Settings > Modes): both slots, every talkgroup, any color code
+	cfg.listen.both_ts = cfg.listen.both_ts || (sm->set.dmr_rx & RADIO_DMR_RX_BOTH_TS) != 0;
+	cfg.listen.hear_all = cfg.listen.hear_all || (sm->set.dmr_rx & RADIO_DMR_RX_ANY_TG) != 0;
+	cfg.listen.any_cc = cfg.listen.any_cc || (sm->set.dmr_rx & RADIO_DMR_RX_ANY_CC) != 0;
 	cfg.listen.groups = sm->listen;
 	cfg.listen.group_count = sm->listen_count;
+	if (sm->set.dmr_rx_tg != 0) {
+		cfg.listen.group_ok = rx_tg_ok;	// the extra RX talkgroup, besides the channel's list
+		cfg.listen.group_ctx = sm;
+	}
 	// The channel's TX time-out when it has one, else the radio's
 	cfg.tot_s = sm->view.tot_s;	// apply_tot: the channel's, else the radio's
 	if (sm->set.reply_s <= 30u) {
@@ -1659,6 +1676,8 @@ static void dmr_configure(radio_sm_t *sm)
 	sm->view.dmr.rmo = cfg.rmo;
 	sm->view.dmr.hear_all = cfg.listen.hear_all;
 	sm->view.dmr.hear_all_latch = hear_all_on(sm);
+	sm->view.dmr.both_ts = cfg.listen.both_ts;
+	sm->view.dmr.any_cc = cfg.listen.any_cc;
 	sm->view.dmr.one_shot = sm->one_shot;
 	sm->view.dmr.target_manual = sm->manual;
 	// The target with its flags in one update (dmr_publish copies the stack's own at the next tick): a reader never
@@ -7956,6 +7975,8 @@ static void settings_to_radio(const settings_t *st, radio_settings_t *s)
 	s->tac_rxend = (st->tac_flags & SETTINGS_TAC_RXEND) != 0;
 	s->tac_tones_off = st->tac_modes;
 	s->roger_off = st->roger_modes;
+	s->dmr_rx = st->dmr_rx & (RADIO_DMR_RX_BOTH_TS | RADIO_DMR_RX_ANY_TG | RADIO_DMR_RX_ANY_CC);
+	s->dmr_rx_tg = (uint32_t)st->dmr_rx_tg[0] | ((uint32_t)st->dmr_rx_tg[1] << 8) | ((uint32_t)st->dmr_rx_tg[2] << 16);
 	s->tx_inhibit = (st->rs_flags & SETTINGS_RS_TX_INHIBIT) != 0;
 	s->scan_priority = (st->rs_flags & SETTINGS_RS_SCAN_PRIORITY) != 0;
 	s->scan_beep = (st->rs_flags & SETTINGS_RS_SCAN_BEEP) != 0;
@@ -7991,6 +8012,10 @@ static void radio_to_settings(const radio_settings_t *s, uint32_t now_ms)
 				  (s->tac_rxend ? SETTINGS_TAC_RXEND : 0) | ((s->tac_style & 4u) != 0 ? SETTINGS_TAC_STYLE_HI : 0));
 	st->tac_modes = s->tac_tones_off;
 	st->roger_modes = s->roger_off;
+	st->dmr_rx = s->dmr_rx;
+	st->dmr_rx_tg[0] = (uint8_t)s->dmr_rx_tg;
+	st->dmr_rx_tg[1] = (uint8_t)(s->dmr_rx_tg >> 8);
+	st->dmr_rx_tg[2] = (uint8_t)(s->dmr_rx_tg >> 16);
 	st->rs_flags = (uint8_t)((s->roger_beep ? SETTINGS_RS_ROGER_BEEP : 0) | (s->tx_inhibit ? SETTINGS_RS_TX_INHIBIT : 0) |
 				 (s->scan_priority ? SETTINGS_RS_SCAN_PRIORITY : 0) |
 				 (s->scan_beep ? SETTINGS_RS_SCAN_BEEP : 0) | (s->key_beep ? SETTINGS_RS_KEY_BEEP : 0) |
@@ -8038,6 +8063,7 @@ static void use_settings(radio_sm_t *sm, const radio_settings_t *s, uint32_t now
 #if CONFIG_DMR
 	bool reply_changed = s->reply_s != sm->set.reply_s || s->sfr_rx != sm->set.sfr_rx ||
 		s->talk_permit != sm->set.talk_permit	// the permit hold (permit_before_key)
+		|| s->dmr_rx != sm->set.dmr_rx || s->dmr_rx_tg != sm->set.dmr_rx_tg	// the receive options
 #if CONFIG_SIG_TONES
 		|| s->sig_dmr[SIG_EV_BEGIN] != sm->set.sig_dmr[SIG_EV_BEGIN]
 #endif
@@ -9390,10 +9416,12 @@ static bool tones_here(const radio_sm_t *sm)
 	return sm->view.ch.mode < 8u && (sm->set.tac_tones_off & (1u << sm->view.ch.mode)) == 0;
 }
 
-__attribute__((unused)) static bool roger_here(const radio_sm_t *sm)
+#if !CONFIG_SIG_TONES
+static bool roger_here(const radio_sm_t *sm)
 {
 	return sm->view.ch.mode < 8u && (sm->set.roger_off & (1u << sm->view.ch.mode)) == 0;
 }
+#endif
 
 // Tactical tones (Settings > Sound): the held key-up once the key tone is over, the unkey tone when a transmission has
 // ended, the reception tone when one starts. Every poll, before anything returns

@@ -1855,6 +1855,34 @@ static void test_dmr_stalled(void)
 }
 
 // The roger sound in DMR (radio/roger_sound.h): on PTT release the encoder gets the sound in place of the mic and the
+// DMR receive options (radio_settings_t.dmr_rx, dmr_rx_tg): both timeslots, any color code, every talkgroup, one
+// extra talkgroup; in the view for Home's chips, saved, and back off
+static void test_dmr_rx_options(void)
+{
+	radio_settings_t rs;
+	settings_t st;
+	dmr_start(true);
+	radio_get_settings(&rs);
+	rs.dmr_rx = RADIO_DMR_RX_BOTH_TS | RADIO_DMR_RX_ANY_CC;
+	rs.dmr_rx_tg = 2350u;
+	radio_set_settings(&rs);
+	run(50);
+	CHECK(sm.view.dmr.both_ts && sm.view.dmr.any_cc && !sm.view.dmr.hear_all);
+	run(2000);
+	settings_read(&st);
+	CHECK(st.dmr_rx == (RADIO_DMR_RX_BOTH_TS | RADIO_DMR_RX_ANY_CC) && st.dmr_rx_tg[0] == (2350u & 0xFFu) &&
+	      st.dmr_rx_tg[1] == (2350u >> 8));
+	rs.dmr_rx = RADIO_DMR_RX_ANY_TG;
+	radio_set_settings(&rs);
+	run(50);
+	CHECK(sm.view.dmr.hear_all && !sm.view.dmr.both_ts && !sm.view.dmr.any_cc);
+	rs.dmr_rx = 0;
+	rs.dmr_rx_tg = 0;
+	radio_set_settings(&rs);
+	run(50);
+	CHECK(!sm.view.dmr.hear_all && !sm.view.dmr.both_ts && !sm.view.dmr.any_cc);
+}
+
 // stack keeps the transmission until it is out, then ends it as usual; PTT again during it carries on with no tone
 #if !CONFIG_SIG_TONES
 static void test_dmr_roger(void)
@@ -10646,6 +10674,7 @@ int main(void)
 	test_dmr_rssi_hold();
 	test_fm_rssi_raw();
 	test_dmr_tx();
+	test_dmr_rx_options();
 #if !CONFIG_SIG_TONES
 	test_dmr_roger();
 #endif

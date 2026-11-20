@@ -23,6 +23,7 @@
 #include "i18n.h"
 #include "input/input.h"
 #include "radio/tones.h"
+#include "radio/beep.h"
 #include "config.h"
 #if CONFIG_C4FM
 #include "ui_modes.h"
@@ -1327,6 +1328,17 @@ static bool split_commit(void)
 	return true;
 }
 
+#if CONFIG_C4FM
+// A setting changed from a Quick tile: stored, then acted on as a Settings row would be
+static void quick_set(uint8_t id, int32_t v)
+{
+	if (ui_svc_setting_set(id, v)) {
+		ui_apply_setting(id, v);
+		ui_svc_apply(id, v);
+	}
+}
+#endif
+
 static void quick_change(uint8_t kind, int8_t dir)
 {
 	switch (kind) {
@@ -1354,6 +1366,24 @@ static void quick_change(uint8_t kind, int8_t dir)
 		ui_st.brightness = (uint8_t)(b < 10 ? 10 : b > 100 ? 100 : b);
 		break;
 	}
+#if CONFIG_C4FM
+	case QT_MIC: {
+		int32_t m = ui_svc_setting_get(UI_SET_MIC_GAIN) + dir;
+		quick_set(UI_SET_MIC_GAIN, m < 0 ? 0 : m > 10 ? 10 : m);
+		break;
+	}
+	case QT_VOICE_VOL: {
+		int32_t g = ui_svc_setting_get(UI_SET_VOICE_RX_GAIN) + 2 * dir;
+		quick_set(UI_SET_VOICE_RX_GAIN, g < -6 ? -6 : g > 12 ? 12 : g);
+		break;
+	}
+	case QT_DGID:
+		ui_st.qnum_edit = (uint32_t)(((int32_t)ui_st.qnum_edit + dir + 100) % 100);
+		break;
+	case QT_RX_TG:
+		ui_st.qnum_edit = (ui_st.qnum_edit + (uint32_t)(int32_t)dir) & 0xFFFFFFu;
+		break;
+#endif
 	default:
 		break;
 	}
@@ -1369,6 +1399,23 @@ static void quick_close_editor(void)
 		ui_toast(TR(WHY_COLOR_CODE_NOT_IN_BUILD, "Color code: not in this build"));
 	if (kind == QT_BRIGHTNESS)
 		ui_svc_setting_set(UI_SET_BRIGHTNESS, ui_st.brightness);
+#if CONFIG_C4FM
+	if (kind == QT_DGID && ui_st.quick_edit)
+		quick_set(UI_SET_C4FM_DGID, (int32_t)(ui_st.qnum_edit % 100u));
+	if (kind == QT_RX_TG && ui_st.quick_edit) {
+		ui_svc_dmr_set_rx_tg(ui_st.qnum_edit);
+		static char msg[24];
+		sbuf_t b;
+		sb_init(&b, msg, sizeof msg);
+		if (ui_st.qnum_edit == 0) {
+			sb_str(&b, TR(QUICK_TOAST_RX_TG_OFF, "RX TG off"));
+		} else {
+			sb_str(&b, TR(QUICK_TOAST_RX_TG, "Also hearing TG "));
+			sb_u32(&b, ui_st.qnum_edit, 1);
+		}
+		ui_toast(msg);
+	}
+#endif
 	ui_st.quick_edit = false;
 }
 
@@ -1388,6 +1435,15 @@ static void quick_unavailable(uint8_t kind)
 	case QT_MODE: ui_toast(TR(WHY_VFO_ONE_MODE_IN_BUILD, "VFO: one mode in this build")); break;
 	case QT_TO_VFO: ui_toast(TR(WHY_VFO_NOT_IN_BUILD, "VFO: not in this build")); break;
 	case QT_VOX: ui_toast(TR(WHY_VOX_NOT_ON_RADIO_YET, "VOX: not on this radio yet")); break;
+#if CONFIG_C4FM
+	case QT_ROGER: ui_toast(TR(QUICK_WHY_ROGER_MODES, "Roger: FM, DMR and C4FM")); break;
+	case QT_VOICE_VOL: ui_toast(TR(QUICK_WHY_VOICE_DIGITAL, "Voice volume: digital modes")); break;
+	case QT_DGID: ui_toast(TR(QUICK_WHY_DGID_C4FM, "DG-ID: a C4FM channel")); break;
+	case QT_BOTH_TS:
+	case QT_ANY_TG:
+	case QT_ANY_CC:
+	case QT_RX_TG: ui_toast(TR(QUICK_WHY_DMR_ONLY, "DMR only")); break;
+#endif
 	default: ui_toast(TR(WHY_NOT_IN_BUILD, "Not in this build")); break;
 	}
 }
@@ -1525,7 +1581,61 @@ static void quick_activate(int tile)
 		ui_toast(msg);
 		break;
 	}
-	default:	// value tiles: squelch, brightness
+#if CONFIG_C4FM
+	case QT_ROGER: {
+		static uint8_t last = 1;	// the sound turned off last, back when turned on (Classic at first)
+		int32_t r = ui_svc_fm_get(UI_SET_FM_ROGER);
+		if (r > 0)
+			last = (uint8_t)r;
+		ui_svc_fm_set(UI_SET_FM_ROGER, r > 0 ? 0 : last);
+		ui_toast(r > 0 ? TR(QUICK_TOAST_ROGER_OFF, "Roger off") : TR(QUICK_TOAST_ROGER_ON, "Roger on"));
+		break;
+	}
+	case QT_TONES: {
+		bool on = !(ui_svc_fm_get(UI_SET_TAC_KEY) || ui_svc_fm_get(UI_SET_TAC_UNKEY) || ui_svc_fm_get(UI_SET_TAC_RX));
+		ui_svc_fm_set(UI_SET_TAC_KEY, on);
+		ui_svc_fm_set(UI_SET_TAC_UNKEY, on);
+		ui_svc_fm_set(UI_SET_TAC_RX, on);
+		ui_toast(on ? TR(QUICK_TOAST_TONES_ON, "Tactical tones on") : TR(QUICK_TOAST_TONES_OFF, "Tactical tones off"));
+		break;
+	}
+	case QT_TAC:
+		quick_set(UI_SET_TAC_MODE, !ui_svc_setting_get(UI_SET_TAC_MODE));
+		break;
+	case QT_LEDS:
+		ui_svc_fm_set(UI_SET_TAC_LEDS, !ui_svc_fm_get(UI_SET_TAC_LEDS));
+		break;
+	case QT_RXEND:
+		ui_svc_fm_set(UI_SET_TAC_RXEND, !ui_svc_fm_get(UI_SET_TAC_RXEND));
+		break;
+	case QT_STYLE:
+		ui_svc_fm_set(UI_SET_TAC_STYLE, (ui_svc_fm_get(UI_SET_TAC_STYLE) + 1) % BEEP_TAC_STYLES);	// plays the new one
+		break;
+	case QT_BOTH_TS:
+	case QT_ANY_TG:
+	case QT_ANY_CC: {
+		uint8_t id = kind == QT_BOTH_TS ? UI_SET_DMR_BOTH_TS : kind == QT_ANY_TG ? UI_SET_DMR_ANY_TG : UI_SET_DMR_ANY_CC;
+		bool on = !ui_svc_fm_get(id);
+		ui_svc_fm_set(id, on);
+		ui_toast(kind == QT_BOTH_TS ? (on ? TR(QUICK_TOAST_BOTH_SLOTS_ON, "Both slots: first call plays") :
+			TR(QUICK_TOAST_BOTH_SLOTS_OFF, "Channel's slot only")) :
+			kind == QT_ANY_TG ? (on ? TR(QUICK_TOAST_ANY_TG_ON, "Every talkgroup heard") :
+				TR(QUICK_TOAST_ANY_TG_OFF, "Listen list only")) :
+			(on ? TR(QUICK_TOAST_ANY_CC_ON, "Any color code heard") :
+				TR(QUICK_TOAST_ANY_CC_OFF, "Channel's color code only")));
+		break;
+	}
+	case QT_DGID:
+		ui_st.qnum_edit = (uint32_t)ui_svc_setting_get(UI_SET_C4FM_DGID);
+		ui_st.quick_edit = true;
+		break;
+	case QT_RX_TG:
+		ui_st.qnum_edit = ui_svc_dmr_rx_tg();
+		ui_st.quick_edit = true;
+		ui_toast(TR(QUICK_TOAST_RX_TG_KEYS, "Type the TG, 0 none, OK sets"));
+		break;
+#endif
+	default:	// value tiles: squelch, brightness, mic, voice
 		ui_st.quick_edit = true;
 		break;
 	}
@@ -1560,6 +1670,15 @@ bool ui_quick_key(const input_event_t *ev)
 		} else if (ui_st.quick_edit && kind == QT_CC) {
 			int c = ui_st.cc_edit * 10 + d;
 			ui_st.cc_edit = (uint8_t)(ui_st.cc_edit < 2 && c <= 15 && ui_st.cc_edit != 0 ? c : d);
+#if CONFIG_C4FM
+		} else if (ui_st.quick_edit && (kind == QT_DGID || kind == QT_RX_TG)) {
+			uint32_t max = kind == QT_DGID ? 99u : 9999999u;
+			uint32_t n = ui_st.qnum_edit * 10u + (uint32_t)d;
+			ui_st.qnum_edit = n <= max ? n : (uint32_t)d;
+		} else if (ui_st.quick_edit && kind == QT_MIC) {
+			quick_set(UI_SET_MIC_GAIN, d == 0 ? 10 : d);
+			ui_st.quick_edit = false;
+#endif
 		} else if (ui_st.quick_edit && kind == QT_BRIGHTNESS) {
 			ui_st.brightness = (uint8_t)(d == 0 ? 100 : d * 10);
 			quick_close_editor();
@@ -1584,6 +1703,11 @@ bool ui_quick_key(const input_event_t *ev)
 				TR(QUICK_TOAST_TONE_RX_AND_TX, "Tone for RX and TX") :
 				ui_st.tone_target == RADIO_TONE_TX ? TR(QUICK_TOAST_TONE_TX_ONLY, "Tone for TX only") :
 					TR(QUICK_TOAST_TONE_RX_ONLY, "Tone for RX only"));
+		} else if (press && ui_quick_pages(view) > 1) {
+			if (ui_st.quick_edit)
+				quick_close_editor();
+			ui_quick_page = (uint8_t)((ui_quick_page % ui_quick_pages(view) + 1u) % ui_quick_pages(view));
+			dirty = true;
 		} else if (press) {
 			ui_toast(TR(TOAST_NO_ACTIONS_HERE, "No actions here"));
 		}

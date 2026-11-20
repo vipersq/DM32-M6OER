@@ -270,7 +270,9 @@ typedef struct {
 	uint8_t tac_bright;		// the backlight in tactical mode, 10-100 %; 0 = the normal brightness
 	uint8_t tac_modes;		// bit (1 << radio_mode_t): the tactical tones off in that mode (0 = on in every mode)
 	uint8_t roger_modes;		// bit (1 << radio_mode_t): the roger sound off in that mode
-	uint8_t reserved_rs[5];		// 0
+	uint8_t dmr_rx;			// RADIO_DMR_RX_* (both timeslots, any talkgroup, any color code; 0 = as the channel)
+	uint8_t dmr_rx_tg[3];		// a talkgroup heard on every DMR channel, little endian 24 bits (0 = none)
+	uint8_t reserved_rs[1];		// 0
 } settings_t;
 
 // Pages: settings_t is stored as records of SETTINGS_PAGE_BYTES each (settings-store.md 2.1). Only the pages its size

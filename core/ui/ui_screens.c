@@ -1820,7 +1820,12 @@ static void draw_chips_dmr(const radio_view_t *v, const ui_state_t *s)
 		if (temp)
 			sb_str(&b, GLYPH_DOT);
 		sb_str(&b, k ? "CC" : "TS");
-		sb_u32(&b, k ? (v->dmr.active ? v->dmr.cc : v->ch.color_code) : (v->dmr.ts ? v->dmr.ts : v->ch.timeslot), 1);
+		if (!k && v->dmr.both_ts && !v->dmr.hear_all)
+			sb_str(&b, "1+2");	// both slots heard (radio_settings_t.dmr_rx), PTT on the channel's
+		else
+			sb_u32(&b, k ? (v->dmr.active ? v->dmr.cc : v->ch.color_code) : (v->dmr.ts ? v->dmr.ts : v->ch.timeslot), 1);
+		if (k && v->dmr.any_cc && !v->dmr.hear_all)
+			sb_chr(&b, '*');	// any color code heard; PTT on the channel's
 		x = gfx_text(f, x, L->chips_y, buf, temp ? ui_col.warn : ui_col.fg) + f->w;
 	}
 	if (v->dmr.rmo)
@@ -2035,7 +2040,7 @@ static void draw_dmr_call(const radio_view_t *v, const ui_state_t *s)
 	}
 	sb_str(&b, "TS");
 	sb_u32(&b, d->rx_ts ? d->rx_ts : d->ts, 1);
-	if (d->hear_all && d->rx_cc != d->cc) {	// found by digital monitor: the code to set to talk to them
+	if (d->rx_cc != d->cc) {	// found by digital monitor or any color code: the code to set to talk to them
 		sb_str(&b, " CC");
 		sb_u32(&b, d->rx_cc, 1);
 	}
@@ -3594,6 +3599,35 @@ void ui_draw_hotspot(const radio_view_t *v, const hotspot_view_t *h, const ui_st
 
 // --- Quick settings (3x3 grid, positions match the keypad; a numbered list on 128x64) ---
 
+uint8_t ui_quick_page;
+
+#if CONFIG_C4FM
+// The C4FM build's pages, by mode: the mode's own first, then (DMR) receive, then sound and tactical. Tile 4 is Mode
+// (Copy to VFO on a channel) on every page
+static const uint8_t qp_sound[UI_QUICK_TILES] = {
+	QT_ROGER, QT_TONES, QT_TAC, QT_MODE, QT_MIC, QT_STYLE, QT_RXEND, QT_LEDS, QT_BRIGHTNESS,
+};
+static const uint8_t qp_dmr_rx[UI_QUICK_TILES] = {
+	QT_BOTH_TS, QT_ANY_TG, QT_ANY_CC, QT_MODE, QT_RX_TG, QT_HEAR_ALL, QT_TALK_TO, QT_VOICE_VOL, QT_TIMESLOT,
+};
+static const uint8_t qp_c4fm[UI_QUICK_TILES] = {
+	QT_POWER, QT_DGID, QT_SQUELCH, QT_MODE, QT_MONITOR, QT_VOICE_VOL, QT_SCAN, QT_MIC, QT_BRIGHTNESS,
+};
+static const uint8_t qp_air[UI_QUICK_TILES] = {	// P25 and NXDN
+	QT_POWER, QT_SQUELCH, QT_VOICE_VOL, QT_MODE, QT_MONITOR, QT_MIC, QT_SCAN, QT_TONES, QT_BRIGHTNESS,
+};
+#endif
+
+uint8_t ui_quick_pages(const radio_view_t *v)
+{
+#if CONFIG_C4FM
+	return v->ch.mode == RADIO_MODE_DMR ? 3 : 2;
+#else
+	(void)v;
+	return 1;
+#endif
+}
+
 uint8_t ui_quick_kind(int pos, const radio_view_t *v)
 {
 	static const uint8_t fm[UI_QUICK_TILES] = {
@@ -3606,7 +3640,20 @@ uint8_t ui_quick_kind(int pos, const radio_view_t *v)
 		return QT_POWER;
 	if (!v->vfo && pos == 3)
 		return QT_TO_VFO;	// a channel's tile 4 copies it to the VFO; the VFO's stays Mode
-	uint8_t kind = v->ch.mode == RADIO_MODE_DMR ? dmr[pos] : fm[pos];
+	const uint8_t *page = v->ch.mode == RADIO_MODE_DMR ? dmr : fm;
+#if CONFIG_C4FM
+	uint8_t pg = (uint8_t)(ui_quick_page % ui_quick_pages(v));
+	uint8_t m = v->ch.mode;
+	if (pg == ui_quick_pages(v) - 1u)
+		page = qp_sound;
+	else if (m == RADIO_MODE_DMR && pg == 1)
+		page = qp_dmr_rx;
+	else if (m == RADIO_MODE_C4FM)
+		page = qp_c4fm;
+	else if (m == RADIO_MODE_P25 || m == RADIO_MODE_NXDN)
+		page = qp_air;
+#endif
+	uint8_t kind = page[pos];
 	if (v->vfo && (kind == QT_MONITOR || kind == QT_PRIVACY))
 		return QT_SPLIT;	// the VFO's TX frequency; Monitor stays on its key, privacy on channels
 	return kind;
@@ -3644,6 +3691,16 @@ bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *l
 		[QT_TO_VFO] = TRN(QUICK_LABEL_COPY_TO_VFO, TEXT_ALT_OPEN "Copy to VFO"
 			TEXT_ALT_NEXT "To VFO" TEXT_ALT_CLOSE),
 		[QT_SPLIT] = TRN(QUICK_LABEL_TX_FREQ, TEXT_ALT_OPEN "TX freq" TEXT_ALT_NEXT "TXFreq" TEXT_ALT_CLOSE),
+		[QT_ROGER] = TRN(QUICK_LABEL_ROGER, "Roger"), [QT_TONES] = TRN(QUICK_LABEL_TONES, "Tones"),
+		[QT_TAC] = TRN(QUICK_LABEL_TACTICAL, TEXT_ALT_OPEN "Tactical" TEXT_ALT_NEXT "Tac" TEXT_ALT_CLOSE),
+		[QT_MIC] = TRN(QUICK_LABEL_MIC, "Mic"), [QT_STYLE] = TRN(QUICK_LABEL_STYLE, "Style"),
+		[QT_LEDS] = TRX(QUICK_LABEL_LEDS, "LEDs"),
+		[QT_RXEND] = TRN(QUICK_LABEL_RX_END, TEXT_ALT_OPEN "RX end" TEXT_ALT_NEXT "RXend" TEXT_ALT_CLOSE),
+		[QT_VOICE_VOL] = TRN(QUICK_LABEL_VOICE, "Voice"), [QT_DGID] = TRX(QUICK_LABEL_DGID, "DG-ID"),
+		[QT_BOTH_TS] = TRN(QUICK_LABEL_BOTH_SLOTS, TEXT_ALT_OPEN "Both slots" TEXT_ALT_NEXT "2 TS" TEXT_ALT_CLOSE),
+		[QT_ANY_TG] = TRN(QUICK_LABEL_ANY_TG, TEXT_ALT_OPEN "Any TG" TEXT_ALT_NEXT "AnyTG" TEXT_ALT_CLOSE),
+		[QT_ANY_CC] = TRN(QUICK_LABEL_ANY_CC, TEXT_ALT_OPEN "Any CC" TEXT_ALT_NEXT "AnyCC" TEXT_ALT_CLOSE),
+		[QT_RX_TG] = TRN(QUICK_LABEL_RX_TG, TEXT_ALT_OPEN "RX TG" TEXT_ALT_NEXT "RXTG" TEXT_ALT_CLOSE),
 	};
 	uint8_t kind = ui_quick_kind(tile, v);
 	bool editing = s->quick_edit && s->quick_focus == tile;
@@ -3753,6 +3810,62 @@ bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *l
 			sb_u32(&b, v->dmr.target_id, 1);
 		return true;
 #endif
+#if CONFIG_C4FM
+	case QT_ROGER: {
+		int32_t r = ui_svc_fm_get(UI_SET_FM_ROGER);
+		sb_str(&b, r > 0 ? TR(VALUE_ON, "On") : TR(VALUE_OFF, "Off"));
+		return v->ch.mode == RADIO_MODE_FM || v->ch.mode == RADIO_MODE_DMR || v->ch.mode == RADIO_MODE_C4FM;
+	}
+	case QT_TONES: {
+		bool on = ui_svc_fm_get(UI_SET_TAC_KEY) || ui_svc_fm_get(UI_SET_TAC_UNKEY) || ui_svc_fm_get(UI_SET_TAC_RX);
+		sb_str(&b, on ? TR(VALUE_ON, "On") : TR(VALUE_OFF, "Off"));
+		return true;
+	}
+	case QT_TAC:
+		sb_str(&b, ui_svc_setting_get(UI_SET_TAC_MODE) ? TR(VALUE_ON, "On") : TR(VALUE_OFF, "Off"));
+		return true;
+	case QT_LEDS:
+		sb_str(&b, ui_svc_fm_get(UI_SET_TAC_LEDS) ? TR(VALUE_OFF, "Off") : TR(VALUE_ON, "On"));
+		return true;
+	case QT_RXEND:
+		sb_str(&b, ui_svc_fm_get(UI_SET_TAC_RXEND) ? TR(VALUE_ON, "On") : TR(VALUE_OFF, "Off"));
+		return true;
+	case QT_STYLE: {
+		static const char *const st[] = { "Deep", "Bloop", "Low", "High", "Harris" };	// short: a tile
+		int32_t i = ui_svc_fm_get(UI_SET_TAC_STYLE);
+		sb_str(&b, st[i >= 0 && i < 5 ? i : 0]);
+		return true;
+	}
+	case QT_MIC:
+		sb_u32(&b, (uint32_t)ui_svc_setting_get(UI_SET_MIC_GAIN), 1);
+		return true;
+	case QT_VOICE_VOL: {
+		int32_t db = ui_svc_setting_get(UI_SET_VOICE_RX_GAIN);
+		if (db > 0)
+			sb_chr(&b, '+');
+		sb_i32(&b, db);
+		sb_str(&b, "dB");
+		return v->ch.mode != RADIO_MODE_FM;
+	}
+	case QT_DGID:
+		sb_u32(&b, editing ? s->qnum_edit : (uint32_t)ui_svc_setting_get(UI_SET_C4FM_DGID), 2);
+		return v->ch.mode == RADIO_MODE_C4FM;
+	case QT_BOTH_TS:
+	case QT_ANY_TG:
+	case QT_ANY_CC: {
+		uint8_t id = kind == QT_BOTH_TS ? UI_SET_DMR_BOTH_TS : kind == QT_ANY_TG ? UI_SET_DMR_ANY_TG : UI_SET_DMR_ANY_CC;
+		sb_str(&b, ui_svc_fm_get(id) ? TR(VALUE_ON, "On") : TR(VALUE_OFF, "Off"));
+		return v->ch.mode == RADIO_MODE_DMR;
+	}
+	case QT_RX_TG: {
+		uint32_t tg = editing ? s->qnum_edit : ui_svc_dmr_rx_tg();
+		if (tg == 0 && !editing)
+			sb_str(&b, TR(VALUE_NONE, "None"));
+		else
+			sb_u32(&b, tg, 1);
+		return v->ch.mode == RADIO_MODE_DMR;
+	}
+#endif
 	default:
 		return false;
 	}
@@ -3822,8 +3935,18 @@ static void __attribute__((noinline)) draw_quick_tiles(const radio_view_t *v, co
 	const char *split_hint = quick_split_hint(v, s, label, sizeof label);
 
 	gfx_clear(ui_col.bg);
-	// Title row keeps the state pill (P2)
-	int top = ui_draw_top(v, s, TR(QUICK_TITLE, "Quick"), name);
+	// Title row keeps the state pill (P2); "Quick 2/3" where # turns pages
+	char title[20];
+	str_copy(title, sizeof title, TR(QUICK_TITLE, "Quick"));
+	if (ui_quick_pages(v) > 1) {
+		sbuf_t tb;
+		sb_init(&tb, title + strlen(title), sizeof title - strlen(title));
+		sb_chr(&tb, ' ');
+		sb_u32(&tb, ui_quick_page % ui_quick_pages(v) + 1u, 1);
+		sb_chr(&tb, '/');
+		sb_u32(&tb, ui_quick_pages(v), 1);
+	}
+	int top = ui_draw_top(v, s, title, name);
 	int bottom = h;
 	if (s->toast != NULL || split_hint != NULL || h >= UI_TALL_PX)
 		bottom = L->hint_y;
@@ -3882,7 +4005,8 @@ static void __attribute__((noinline)) draw_quick_tiles(const radio_view_t *v, co
 	else if (split_hint != NULL)
 		ui_draw_hint(quick_split_hint(v, s, label, sizeof label), false);	// the tiles used label
 	else if (h >= UI_TALL_PX)
-		ui_draw_hint(TR(QUICK_HINT_ALL_SETTINGS, "0 All settings  Hold OK save"), false);
+		ui_draw_hint(ui_quick_pages(v) > 1 ? TR(QUICK_HINT_PAGES, "# Next page  0 All settings") :
+			TR(QUICK_HINT_ALL_SETTINGS, "0 All settings  Hold OK save"), false);
 }
 
 void ui_draw_quick(const radio_view_t *v, const ui_state_t *s)

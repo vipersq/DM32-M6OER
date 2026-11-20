@@ -108,6 +108,7 @@ typedef struct {
 	uint8_t tone_target;		// Tone editor: RADIO_TONE_BOTH, RADIO_TONE_TX or RADIO_TONE_RX
 	subtone_t tone_edit;		// Tone editor: the value picked (shown at once, before the radio's view catches up)
 	uint8_t cc_edit;		// Color code editor: the value picked
+	uint32_t qnum_edit;		// Quick's number editors (DG-ID, RX talkgroup): the value typed
 	uint8_t diag_first;	// first board line on the diagnostics page
 	bool locked;		// keys locked (long QUICK)
 	bool scanning;
@@ -145,10 +146,16 @@ enum {
 	QT_TIMESLOT, QT_CC, QT_HEAR_ALL, QT_PRIVACY, QT_TALK_TO,
 	QT_TO_VFO,		// on a channel, in place of QT_MODE: copy the channel to the VFO
 	QT_SPLIT,		// in the VFO, in place of QT_MONITOR (FM) / QT_PRIVACY (DMR): the TX frequency or offset
+	// The C4FM build's further pages (ui_quick_pages): sound and tactical, DMR receive, the mode's own
+	QT_ROGER, QT_TONES, QT_TAC, QT_MIC, QT_STYLE, QT_LEDS, QT_RXEND, QT_VOICE_VOL, QT_DGID,
+	QT_BOTH_TS, QT_ANY_TG, QT_ANY_CC, QT_RX_TG,
 
 };
-// The tile kind at position 0..8 (keys 1..9) for this channel or the VFO
+// The tile kind at position 0..8 (keys 1..9) for this channel or the VFO, on page ui_quick_page
 uint8_t ui_quick_kind(int pos, const radio_view_t *v);
+// Quick's pages for the mode on view (# turns them; the C4FM build has more than one) and the one shown
+uint8_t ui_quick_pages(const radio_view_t *v);
+extern uint8_t ui_quick_page;
 // True when a contact name only repeats its ID ("TG 123" for talkgroup 123): Home then shows the ID once
 bool ui_name_is_id(const char *name, uint32_t id, bool private_call);
 

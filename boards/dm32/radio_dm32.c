@@ -21,6 +21,10 @@
 
 #define UHF_FROM_HZ		280000000u	// PA / LNA band split (8.5)
 #define MIC_GAIN_DB		11u		// GCR_ADCL at init (9.1)
+// The mic gain at each transmission's start, with Settings > Mic gain's offset (hal_radio_t.mic_gain, -10..+10 dB):
+// FM 5 dB above the init value (the stock level sounded quiet on the air), DMR and C4FM (the vocoder's input) 3 dB
+#define MIC_GAIN_FM_DB		16u
+#define MIC_GAIN_DIG_DB		14u
 // DMR bursts on the shared RF-burst task (dmr_rfburst.h), timed from the RF TX interrupt (hardware-dm32.md 8.5). The PA
 // keys up from the power cal table (radio/pa_keyup.h): a drive boost sized for the step, then the
 // step's drive. A low step's drive alone took 3-4 ms to full power; with the boost every step is up by the first
@@ -101,6 +105,7 @@ static radio_bw_t rx_bw = RADIO_BW_12K5;
 static subtone_t rx_tone;
 static bool have_rx;
 static bool transmitting;
+static volatile int8_t mic_offset_db;	// hal_radio_t.mic_gain: taken at the next transmission start
 static uint32_t tx_hz;		// TX frequency: the FM tone deviation, the LNA band between DMR bursts
 static bool tx_wide;
 static volatile bool dmr_keyed;		// DMR transmission on: the burst sequence may key the PA
@@ -404,7 +409,8 @@ static void set_mode(radio_mode_t m)
 		}
 		fd6818_set_mode(&fd, FD6818_MODE_DMR);
 		hrc_dac_b_power(true);
-		hrc7000_dmr_enter(&modem, hrc7000_mod_bias(bf_cal_tx_center(), bf_cal_modcal(rx_hz)), MIC_GAIN_DB);
+		hrc7000_dmr_enter(&modem, hrc7000_mod_bias(bf_cal_tx_center(), bf_cal_modcal(rx_hz)),
+				  hrc7000_mic_db(MIC_GAIN_DIG_DB, mic_offset_db));
 		mode = RADIO_MODE_C4FM;
 		hrc_c4fm_enter();
 		have_rx = false;
@@ -414,7 +420,8 @@ static void set_mode(radio_mode_t m)
 	if (m == RADIO_MODE_DMR && CONFIG_DMR) {
 		fd6818_set_mode(&fd, FD6818_MODE_DMR);
 		hrc_dac_b_power(true);	// FM receive powers DAC B down; DMR needs it (hardware-dm32.md 3.8)
-		hrc7000_dmr_enter(&modem, hrc7000_mod_bias(bf_cal_tx_center(), bf_cal_modcal(rx_hz)), MIC_GAIN_DB);
+		hrc7000_dmr_enter(&modem, hrc7000_mod_bias(bf_cal_tx_center(), bf_cal_modcal(rx_hz)),
+				  hrc7000_mic_db(MIC_GAIN_DIG_DB, mic_offset_db));
 		mode = RADIO_MODE_DMR;
 		hrc_dmr_enter();
 	} else {
@@ -573,6 +580,7 @@ static bool tx(uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t *tone)
 		// receives: the FD6818 in RX and the LNA on until the RF task switches to the first burst (burst_on). In TX
 		// here, the hotspot, which keys to listen, heard nothing until its first burst
 		hrc_pin_write(PIN_MIC_PATH, false);
+		hrc7000_set_mic_gain(&modem, hrc7000_mic_db(MIC_GAIN_DIG_DB, mic_offset_db));
 		lna(have_rx ? rx_hz : hz, true);
 		fd6818_set_bandwidth(&fd, fd.variant->bw_dmr);
 		fd6818_set_state(&fd, FD6818_STATE_RX);
@@ -592,6 +600,7 @@ static bool tx(uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t *tone)
 		tx_wide = bw == RADIO_BW_25K;
 		hrc7000_set_subtone(&modem, true, c7_tone(tone != NULL ? tone->type : TONE_NONE),
 			tone != NULL ? tone->value : 0);	// before FM_PTT: the modem takes the DCS code then
+		hrc7000_set_mic_gain(&modem, hrc7000_mic_db(MIC_GAIN_FM_DB, mic_offset_db));
 		hrc7000_fm_tx(&modem, tx_wide);
 		hrc_pin_write(PIN_MIC_PATH, true);
 		fd6818_set_bandwidth(&fd, fm_bw_reg(bw));
@@ -913,7 +922,14 @@ bool dm32_chip_reg(uint8_t chip, uint8_t page, uint8_t reg, uint32_t *val, bool 
 	return true;
 }
 
+// Settings > Mic gain (core/radio/mic_gain.h): stored, taken at the next transmission start (FM and digital)
+static void mic_gain(int8_t db)
+{
+	mic_offset_db = db;
+}
+
 const hal_radio_t dm32_radio = {
+	.mic_gain = mic_gain,
 	.init = init,
 	.set_mode = set_mode,
 	.rx = rx,
