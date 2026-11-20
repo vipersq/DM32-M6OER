@@ -1,3 +1,21 @@
+# DM32-M6OER: a personal DM-32UV build
+
+> **Kriss M6OER's own firmware for the Baofeng DM-32UV**, built on
+> [RadioFoundry C4FM](https://github.com/lycanananas/RadioFoundryC4FM) (Yaesu System Fusion on the DM-32UV), which is
+> built on [RadioFoundry](https://radiofoundry.org). Not affiliated with either project. Build it with
+> `make BOARD=dm32 VARIANT=c4fm`.
+>
+> Added here: P25 and NXDN from RadioFoundry alongside C4FM; C4FM VW (full rate) receive; roger sounds in FM, DMR and
+> C4FM; tactical tones (PTT, release, reception start and end, several styles) and a red tactical screen; Quick pages
+> per mode; DMR both timeslots, any talkgroup, any color code and an extra RX talkgroup; the caller's name and city
+> from the RadioID database; a mic compressor and a stronger mic level; dual watch; tactical side key functions; a
+> boot picture and callsign; a regrouped menu. See [docs/spec/c4fm.md](docs/spec/c4fm.md).
+>
+> **License.** As the projects it comes from: RadioFoundry's files are MIT ([LICENSE](LICENSE), [AUTHORS](AUTHORS),
+> their SPDX lines kept); `core/c4fm/` and its tests are GPL-2.0-or-later, so this firmware as built is a
+> GPL-2.0-or-later work ([LICENSES/GPL-2.0-or-later.txt](LICENSES/GPL-2.0-or-later.txt)). This build's changes:
+> Copyright (c) 2026 Kriss M6OER, under the license of each file they are in.
+
 # RadioFoundry C4FM (proof of concept)
 
 > **This is a fork of [RadioFoundry](https://radiofoundry.org) that adds Yaesu System Fusion (C4FM DN voice) to the
