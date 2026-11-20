@@ -99,6 +99,9 @@ bool ambeVoiceTestSignal(void);
 // next block, then goes back to the mic. Busy from the call until the sound's last block is encoded; cancel stops it.
 // Any task
 void ambeVoiceTxTone(uint8_t sound);
+// C4FM VW (CONFIG_C4FM): one full-rate frame (core/mbe/imbe.h, the 88 bits and what the FEC corrected, IMBE_ERRS) into
+// the call the sink has open, played in turn with the full-rate decoder. The call task
+void ambeVoiceImbeFrame(const uint8_t imbe[11], uint8_t errs);
 void ambeVoiceTxToneCancel(void);
 bool ambeVoiceTxToneBusy(void);
 // Encode options for DMR transmissions (VOCODER_OPT_*, default VOCODER_OPT_DEFAULT; Settings > Talk & listen > Mic

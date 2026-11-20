@@ -4,6 +4,10 @@
 #include "dmr/ambe/ambeVoice.h"
 #include "dmr/ambe/ambeFec.h"
 #include "radio/roger_sound.h"
+#include "config.h"
+#if CONFIG_C4FM
+#include "mbe/imbe.h"
+#endif
 
 #include <stddef.h>
 #include <string.h>
@@ -18,6 +22,7 @@
 typedef struct {
 	uint8_t seq;		// call it belongs to
 	uint8_t bad;		// 1 uncorrectable, 2 lost
+	uint8_t imbe;		// C4FM VW: bits[] holds a full-rate frame (IMBE_BYTES) and bad its IMBE_ERRS
 	uint8_t bits[VOCODER_BITS];
 } rx_entry_t;
 
@@ -83,7 +88,7 @@ static void ensure_streaming(void)
 
 // --- sink (call task) ---
 
-static void rx_push(const uint8_t bits[VOCODER_BITS], uint8_t bad)
+static void rx_push_kind(const uint8_t *bits, uint8_t len, uint8_t bad, uint8_t imbe)
 {
 	uint8_t h = rx_head;
 	if ((uint8_t)(h - LOAD(rx_tail)) >= AMBE_VOICE_QUEUE) {
@@ -96,11 +101,34 @@ static void rx_push(const uint8_t bits[VOCODER_BITS], uint8_t bad)
 	rx_entry_t *e = &rxq[h & (AMBE_VOICE_QUEUE - 1)];
 	e->seq = rx_seq;
 	e->bad = bad;
+	e->imbe = imbe;
 	if (bits != NULL) {
-		memcpy(e->bits, bits, VOCODER_BITS);
+		memcpy(e->bits, bits, len);
 	}
 	STORE(rx_head, (uint8_t)(h + 1));
 }
+
+static void rx_push(const uint8_t bits[VOCODER_BITS], uint8_t bad)
+{
+	rx_push_kind(bits, VOCODER_BITS, bad, 0);
+}
+
+#if CONFIG_C4FM
+// The full-rate decoder for C4FM VW (core/mbe): its memory, about 3.4 KB, the audio callback's only
+static imbe_dec_state_t imbe_st;
+static mbe_params_t imbe_p;
+static mbe_state_t imbe_ms;
+static mbe_frame_t imbe_prev, imbe_cur;
+static int32_t imbe_buf[MBE_BUF_WORDS];
+static const imbe_mem_t imbe_mem = { &imbe_st, &imbe_p, { &imbe_ms, &imbe_prev, &imbe_cur, imbe_buf } };
+static bool imbe_last;		// the call's last frame was full rate: conceal with that decoder
+
+void ambeVoiceImbeFrame(const uint8_t imbe[IMBE_BYTES], uint8_t errs)
+{
+	stats.rx_in++;
+	rx_push_kind(imbe, IMBE_BYTES, errs, 1);
+}
+#endif
 
 static void sink_begin(const dmr_caller_t *caller, void *ctx)
 {
@@ -223,6 +251,13 @@ static void test_block(int16_t *out)
 
 static void conceal(int16_t *spk)
 {
+#if CONFIG_C4FM
+	if (imbe_last) {
+		stats.rx_concealed++;
+		(void)imbe_dec_frame(&imbe_mem, imbe_silence, IMBE_ERRS_LOST, spk);	// the decoder repeats, then mutes
+		return;
+	}
+#endif
 	if (have_last && cb_bad_run < AMBE_VOICE_REPEAT && voc_ok()) {
 		stats.rx_concealed++;
 		voc->decode(last_bits, spk);
@@ -253,6 +288,10 @@ static void rx_block(int16_t *spk)
 		if (voc_ok()) {
 			voc->reset();
 		}
+#if CONFIG_C4FM
+		imbe_dec_init(&imbe_mem);
+		imbe_last = false;
+#endif
 	}
 	// Drop entries of earlier calls
 	uint8_t t = rx_tail, h = LOAD(rx_head);
@@ -299,6 +338,26 @@ static void rx_block(int16_t *spk)
 		return;
 	}
 	const rx_entry_t *e = &rxq[t & (AMBE_VOICE_QUEUE - 1)];
+#if CONFIG_C4FM
+	if (e->imbe) {
+		imbe_last = true;
+		STORE(rx_tail, (uint8_t)(t + 1));
+		if (imbe_dec_frame(&imbe_mem, e->bits, e->bad, spk) == 0) {
+			stats.rx_frames++;
+			cb_call_frames++;
+			for (int i = 0; i < AUDIO_BLOCK_SAMPLES; i++) {
+				uint32_t a = (uint32_t)(spk[i] < 0 ? -spk[i] : spk[i]);
+				if (a > stats.rx_peak) {
+					stats.rx_peak = a;
+				}
+			}
+		} else {
+			stats.rx_concealed++;
+		}
+		return;
+	}
+	imbe_last = false;
+#endif
 	if (e->bad == 0) {
 		memcpy(last_bits, e->bits, VOCODER_BITS);
 		have_last = true;

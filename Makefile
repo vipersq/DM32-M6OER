@@ -77,7 +77,7 @@ ifeq ($(CONFIG_DMR),y)
 CORE_DIRS += core/dmr/call core/dmr/ambe core/dmr/fec
 endif
 ifeq ($(CONFIG_C4FM),y)
-CORE_DIRS += core/c4fm
+CORE_DIRS += core/c4fm core/mbe core/fec
 endif
 ifeq ($(CONFIG_HOSTLINK),y)
 CORE_DIRS += core/hostlink

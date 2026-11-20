@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 The RadioFoundry Authors
 // C4FM DN voice calls (c4fm_call.h)
+#include "ysf_vw.h"
+#include "dmr/ambe/ambeVoice.h"
 #include "c4fm_call.h"
 
 #include <stddef.h>
@@ -169,6 +171,24 @@ static void playAmbe(const uint8_t ambe[YSF_VCH_PER_FRAME][YSF_AMBE_BITS])
 		ambeFecEncode(ambe[j], f72);
 		sink->frame(f72, sink->ctx);
 		view.rx_ambe++;
+	}
+}
+
+// C4FM VW: the frame's full-rate words into the call (ambeVoiceImbeFrame); the FEC's corrections counted as DN's are
+static void playImbe(const uint8_t *frame, const ysf_fich_t *f)
+{
+	if (!in_call) {
+		return;
+	}
+	uint8_t words = ysfVwWords(f->fn, f->ft);
+	for (unsigned j = 0; j < YSF_VW_WORDS; j++) {
+		if ((words >> j) & 1u) {
+			uint8_t imbe[IMBE_BYTES];
+			uint8_t e = ysfVwDecode(frame, j, imbe);
+			view.rx_vch_errors += IMBE_ERRS_TOTAL(e);
+			ambeVoiceImbeFrame(imbe, e);
+			view.rx_ambe++;
+		}
 	}
 }
 
@@ -447,6 +467,7 @@ static void onFrameBody(const uint8_t frame[YSF_FRAME_BYTES], const c4fm_frame_i
 
 	bool ours = cfg.dgid == 0 || f.dgid == cfg.dgid;
 	bool dn = f.dt == YSF_DT_VD2;
+	bool vw = f.dt == YSF_DT_VOICE_FR;	// full rate: played with core/mbe (ysf_vw.h)
 	if (f.dt == YSF_DT_DATA_FR && fich) {
 		wxReceive(frame, info, &f, soft);
 	}
@@ -456,7 +477,7 @@ static void onFrameBody(const uint8_t frame[YSF_FRAME_BYTES], const c4fm_frame_i
 		callEnd();	// a header always starts a new call
 		view.dgid = f.dgid;
 		view.dt = f.dt;
-		callBegin(ours && dn, false);
+		callBegin(ours && (dn || vw), false);
 		raw.hdr_ok = (uint8_t)(soft ? ysfCsdDecodeSoft(info->soft, raw.hdr_csd1, raw.hdr_csd2)
 					     : ysfCsdDecode(frame, raw.hdr_csd1, raw.hdr_csd2));
 		raw.serial++;
@@ -472,11 +493,15 @@ static void onFrameBody(const uint8_t frame[YSF_FRAME_BYTES], const c4fm_frame_i
 		if (view.phase != C4FM_PHASE_RX_VOICE && view.phase != C4FM_PHASE_RX_BUSY) {
 			view.dgid = f.dgid;
 			view.dt = f.dt;
-			callBegin(ours && dn, true);
+			callBegin(ours && (dn || vw), true);
 		}
 		if (f.dt != view.dt) {
 			view.dt = f.dt;
 			changed();
+		}
+		if (vw) {
+			playImbe(frame, &f);
+			break;
 		}
 		if (!dn) {
 			break;

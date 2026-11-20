@@ -132,6 +132,11 @@ aprsTest: aprsTest.c $(APRSLIB) $(NMEALIB) $(wildcard $(CORE)/aprs/*.h)
 
 # C4FM (the GPL fork's core/c4fm): YSF layer 2 against MMDVM_CM vectors, the baseband receiver, two-radio calls
 TESTS   += c4fmYsfTest c4fmDspTest c4fmCallTest
+TESTS   += c4fmVwTest
+MBEDEC  := $(CORE)/mbe/imbe_dec.c $(CORE)/mbe/imbe_tab.c $(CORE)/mbe/mbe_dsp.c $(CORE)/mbe/mbe_synth.c $(CORE)/mbe/mbe_tab.c \
+           $(CORE)/fec/golay.c $(CORE)/fec/hamming.c
+c4fmVwTest: c4fmVwTest.c $(CORE)/c4fm/ysf_vw.c $(CORE)/c4fm/ysf_vw.h $(MBEDEC)
+	$(CC) $(CFLAGS) -o $@ c4fmVwTest.c $(MBEDEC)
 C4FMLIB := $(CORE)/c4fm/ysf.c $(CORE)/dmr/ambe/ambeFec.c
 c4fmYsfTest: c4fmYsfTest.c c4fmOracle.h $(C4FMLIB) $(wildcard $(CORE)/c4fm/*.h)
 	$(CC) $(CFLAGS) -o $@ c4fmYsfTest.c $(C4FMLIB)
