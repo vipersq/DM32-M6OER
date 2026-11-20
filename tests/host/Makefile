@@ -133,6 +133,12 @@ aprsTest: aprsTest.c $(APRSLIB) $(NMEALIB) $(wildcard $(CORE)/aprs/*.h)
 # C4FM (the GPL fork's core/c4fm): YSF layer 2 against MMDVM_CM vectors, the baseband receiver, two-radio calls
 TESTS   += c4fmYsfTest c4fmDspTest c4fmCallTest
 TESTS   += c4fmVwTest
+TESTS   += fmRxShareTest
+# A copy beside the stubs: the source's own directory would otherwise give it the real platform.h (C-SKY assembly)
+fmRxShareTest: fmRxShareTest.c $(ROOT)/platform/hrc7000/fm_rx_audio.c $(ROOT)/platform/hrc7000/fm_rx_audio.h $(wildcard stub/fmrx/*.h)
+	mkdir -p out/fmrx && cp stub/fmrx/*.h $(ROOT)/platform/hrc7000/fm_rx_audio.c $(ROOT)/platform/hrc7000/fm_rx_audio.h out/fmrx/
+	$(CC) $(CFLAGS) -DCONFIG_C4FM=1 -DCONFIG_APRS_RX=1 -Iout/fmrx -I$(ROOT)/drivers -I$(ROOT)/hal \
+	      -o $@ fmRxShareTest.c out/fmrx/fm_rx_audio.c
 MBEDEC  := $(CORE)/mbe/imbe_dec.c $(CORE)/mbe/imbe_tab.c $(CORE)/mbe/mbe_dsp.c $(CORE)/mbe/mbe_synth.c $(CORE)/mbe/mbe_tab.c \
            $(CORE)/fec/golay.c $(CORE)/fec/hamming.c
 c4fmVwTest: c4fmVwTest.c $(CORE)/c4fm/ysf_vw.c $(CORE)/c4fm/ysf_vw.h $(MBEDEC)
@@ -152,6 +158,7 @@ c4fmCallTest: c4fmCallTest.c $(CORE)/c4fm/c4fm_call.c $(CORE)/c4fm/c4fm_dsp.c $(
 run: $(TESTS)
 	./c4fmYsfTest
 	./c4fmVwTest
+	./fmRxShareTest
 	./c4fmDspTest
 	./c4fmCallTest
 	./dmrFecTest

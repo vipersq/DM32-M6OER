@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
 ## title: C4FM
-## summary: FM, DMR and C4FM (Yaesu System Fusion DN) in one firmware; DMR voice and SMS, no IP or network services.
+## summary: FM, DMR, C4FM (Yaesu System Fusion DN and VW) and APRS in one firmware; DMR voice and SMS, no IP or network services.
 ##
 ## make BOARD=<board> VARIANT=c4fm. The GPL fork's build (docs/spec/c4fm.md): C4FM on beside FM and DMR (voice,
 ## channels, contacts, SMS), and off what a radio for QSOs doesn't need (IP, the cable's network services, the hotspot,
@@ -27,8 +27,8 @@ CONFIG_HOTSPOT ?= n
 CONFIG_NET_PPP ?= n
 CONFIG_SNMP ?= n
 
-# APRS shares the HR_C7000's FM receive audio copy with the C4FM receiver
-CONFIG_APRS ?= n
+# APRS is on: it shares the HR_C7000's FM receive audio copy with the C4FM receiver, one at a time (APRS on the APRS
+# frequency in FM, C4FM on C4FM channels; C4FM first, platform/hrc7000/fm_rx_audio.h)
 
 # Receivers and extras this proof of concept leaves out
 CONFIG_DUAL_WATCH ?= n

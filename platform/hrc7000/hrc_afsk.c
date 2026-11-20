@@ -149,7 +149,7 @@ static bool rx_start(void)
 	if (hooks->listen != NULL) {
 		hooks->listen(true);
 	}
-	if (!hrc_fm_rx_start()) {
+	if (!hrc_fm_rx_start(HRC_FM_RX_APRS)) {
 		if (hooks->listen != NULL) {
 			hooks->listen(false);
 		}
@@ -160,7 +160,7 @@ static bool rx_start(void)
 
 static void rx_stop(void)
 {
-	hrc_fm_rx_stop();
+	hrc_fm_rx_stop(HRC_FM_RX_APRS);
 	if (hooks->listen != NULL) {
 		hooks->listen(false);
 	}
@@ -174,7 +174,7 @@ const hal_afsk_t hrc_afsk = {
 #if CONFIG_APRS_RX && CONFIG_DMR
 	.rx_rate_hz = HRC7000_FM_RX_RATE,
 	.rx_start = rx_start,
-	.rx_read = hrc_fm_rx_read,
+	.rx_read = hrc_fm_rx_read_aprs,
 	.rx_stop = rx_stop,
 #endif
 };

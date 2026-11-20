@@ -79,18 +79,20 @@ static bool hub_has_last(void)
 #endif
 
 #if CONFIG_C4FM
-static void open_mode_page(uint8_t mode);	// with the settings pages, below
+static void open_channel_page(void);	// with the settings pages, below
+static void open_calls_page(void);
 
-// The C4FM build's Menu (docs/spec/c4fm.md 6): VFO <-> memory first, the shared lists, a page per mode (the one in use
-// marked), Tools and Settings. The DMR lists (contacts, messages, recent, last caller) are on the DMR page
-enum { HUBC_VFO, HUBC_ZONES, HUBC_CHANNELS, HUBC_FM, HUBC_DMR, HUBC_C4FM, HUBC_TOOLS, HUBC_SETTINGS, HUBC_COUNT };
+// The C4FM build's Menu (docs/spec/c4fm.md 6), by what one does: VFO <-> memory, the lists, the channel in use, the
+// calls heard and the contacts, Wires-X, Tools, Settings. Every setting has one place (Settings)
+enum { HUBC_VFO, HUBC_ZONES, HUBC_CHANNELS, HUBC_CHANNEL, HUBC_CALLS, HUBC_WIRESX, HUBC_TOOLS, HUBC_SETTINGS,
+       HUBC_COUNT };
 
 static uint16_t hub_count(void) { return HUBC_COUNT; }
 
 static void hub_item(uint16_t i, ui_item_t *it)
 {
-	static const char *const names[] = { NULL, TRN("Zones"), TRN("Channels"), TRN("FM"), TRN("DMR"), TRN("C4FM"),
-					     TRN("Tools"), TRN("Settings") };
+	static const char *const names[] = { NULL, TRN("Zones"), TRN("Channels"), TRN("This channel"), TRN("Calls"),
+					     TRN("Wires-X"), TRN("Tools"), TRN("Settings") };
 	const radio_view_t *v = ui_view();
 	if (i == HUBC_VFO) {
 		str_copy(it->label, sizeof it->label, v->vfo ? TR("Switch to Memory") : TR("Switch to VFO"));
@@ -100,14 +102,15 @@ static void hub_item(uint16_t i, ui_item_t *it)
 	item_num(it, i);
 	sbuf_t b;
 	sb_init(&b, it->value, sizeof it->value);
-	uint8_t mode = i == HUBC_FM ? RADIO_MODE_FM : i == HUBC_DMR ? RADIO_MODE_DMR : i == HUBC_C4FM ? RADIO_MODE_C4FM
-		: 0xFF;
-	if (mode != 0xFF && v->ch.mode == mode) {
-		sb_str(&b, TR("in use"));
-	} else if (i == HUBC_DMR && ui_st.unread) {
+	if (i == HUBC_CHANNEL) {
+		sb_str(&b, v->ch.mode == RADIO_MODE_C4FM ? "C4FM" : v->ch.mode == RADIO_MODE_DMR ? "DMR" : "FM");
+	} else if (i == HUBC_CALLS && ui_st.unread) {
 		sb_u32(&b, ui_st.unread, 1);
 		sb_str(&b, TR(" new"));
 		it->flags |= UI_ITEM_WARN;
+	} else if (i == HUBC_WIRESX && v->ch.mode != RADIO_MODE_C4FM) {
+		sb_str(&b, TR("C4FM only"));
+		it->flags |= UI_ITEM_DIM;
 	} else if (i == HUBC_ZONES) {
 		sb_str(&b, TEXT_ALT_OPEN);
 		sb_str(&b, v->vfo ? "VFO" : v->zone_name);
@@ -133,9 +136,9 @@ static void hub_select(uint16_t i, bool hold)
 		}
 		ui_push(SCR_CHANNELS, 0);
 		break;
-	case HUBC_FM: open_mode_page(RADIO_MODE_FM); break;
-	case HUBC_DMR: open_mode_page(RADIO_MODE_DMR); break;
-	case HUBC_C4FM: open_mode_page(RADIO_MODE_C4FM); break;
+	case HUBC_CHANNEL: open_channel_page(); break;
+	case HUBC_CALLS: open_calls_page(); break;
+	case HUBC_WIRESX: ui_open_wiresx(); break;
 	case HUBC_TOOLS: ui_push(SCR_TOOLS, 0); break;
 	default: ui_push(SCR_SETTINGS, 0); break;
 	}
@@ -5381,6 +5384,12 @@ static bool tool_shown(uint16_t i)
 	if (i == T_ZONE_OFFER)
 		return offer_waiting();	// 0 on the keypad: only while another radio's zone waits
 #endif
+#if CONFIG_C4FM
+	// The C4FM build lists only what it has: Diagnostics is in Settings > Advanced, the tools it leaves out aren't shown
+	if (i == T_DIAG || (i == T_HOTSPOT && !CONFIG_HOTSPOT) || (i == T_USB_NET && !CONFIG_USB_NETWORK) ||
+	    (i == T_SFR && !CONFIG_SFR) || (i == T_ROAM && !CONFIG_DMR_ROAMING))
+		return false;
+#endif
 	return (i != T_DIAG || CONFIG_DIAG) && (i != T_BATTERY || board_volts() != BOARD_VOLTS_NONE) &&
 	       i != T_ZONE_OFFER;
 }
@@ -5396,7 +5405,7 @@ static uint16_t tools_count(void)
 	for (uint16_t i = 0; i < T_COUNT; i++) {
 		if (tool_shown(i)) {
 			n++;
-			last = (uint16_t)(i + 1u);
+			last = CONFIG_C4FM ? n : (uint16_t)(i + 1u);	// the C4FM build numbers its rows in a row
 		}
 	}
 	sbuf_t b;
@@ -5427,7 +5436,11 @@ static void tools_item(uint16_t row, ui_item_t *it)
 		return;
 	str_copy(it->label, sizeof it->label, i == T_BATTERY && board_volts() == BOARD_VOLTS_SUPPLY ? TR("Supply") :
 		 tr(names[i]));
+#if CONFIG_C4FM
+	item_num(it, (uint16_t)(row + 1u));	// the C4FM build hides what it hasn't: numbered in a row, no gaps
+#else
 	item_num(it, (uint16_t)(i + 1u));	// the tool's own number, not its row (see the enum)
+#endif
 	sbuf_t b;
 	sb_init(&b, it->value, sizeof it->value);
 	switch (i) {
@@ -5783,11 +5796,13 @@ static const set_item_t s_privacy[] = {
 	NUMBER(TRN("Key"), "privacy BP", UI_SET_PRIVACY_KEY, 1, 255, 1, NULL),	// the range follows the type (set_range)
 };
 // The key lock's rules: when it locks by itself and what still works while locked
+#if !CONFIG_C4FM
 static const set_item_t s_lock[] = {
 	LIST(TRN("Auto lock"), "keylock", UI_SET_AUTO_LOCK_S, v_lock, n_lock),
 	TOGGLE(TRN("PTT when locked"), NULL, UI_SET_PTT_LOCKED),
 	TOGGLE(TRN("Knob when locked"), "volume knob key lock", UI_SET_KNOB_WHEN_LOCKED),
 };
+#endif
 static const set_item_t s_location[] = {
 	TOGGLE("GPS", NULL, UI_SET_GPS),
 	LIST(TRN("Position format"), NULL, UI_SET_POS_FORMAT, v_posfmt, n_posfmt),
@@ -5825,11 +5840,13 @@ static const set_item_t s_connections[] = {
 	ACTION(TRN("Data services"), "ARS registration presence server IP gateway off-net", SA_DATA_SERVICES),
 #endif
 };
+#if !CONFIG_C4FM
 static const set_item_t s_power[] = {
 	TOGGLE(TRN("Battery saver"), NULL, UI_SET_BATTERY_SAVER),
 	LIST(TRN("Auto power off"), NULL, UI_SET_AUTO_OFF_MIN, v_autooff, n_autooff),
 	NUMBER(TRN("Low battery warning"), NULL, UI_SET_LOW_BATTERY, 5, 30, 5, "%"),
 };
+#endif
 #if CONFIG_KEY_ASSIGN
 // Settings > Keys: a row pair per key the board lets the user reassign, named as on the radio ("SK1", "SK1 hold")
 _Static_assert(UI_KEY_ROLES == 9, "KEY_ROWS below");
@@ -5858,24 +5875,30 @@ static void key_labels(void)
 	}
 }
 #endif
-static const set_item_t s_keys[] = {
-	NUMBER(TRN("Long press time"), NULL, UI_SET_LONG_PRESS_MS, 400, 1200, 100, " ms"),
-	NUMBER(TRN("Key repeat"), NULL, UI_SET_REPEAT_MS, 60, 300, 20, " ms"),
-	LIST(TRN("Up/Down on Home"), NULL, UI_SET_UPDOWN_HOME, v_updown, n_updown),
 #if CONFIG_KEY_ASSIGN
 #define KEY_ROWS(r) \
 	LIST(key_label[2 * (r)], "button programmable", UI_SET_KEY_FIRST + 2 * (r), v_keyfn_press, n_keyfn_press), \
 	LIST(key_label[2 * (r) + 1], "button programmable long press", UI_SET_KEY_FIRST + 2 * (r) + 1, v_keyfn_hold, \
 	     n_keyfn_hold)
+#endif
+#if !CONFIG_C4FM
+static const set_item_t s_keys[] = {
+	NUMBER(TRN("Long press time"), NULL, UI_SET_LONG_PRESS_MS, 400, 1200, 100, " ms"),
+	NUMBER(TRN("Key repeat"), NULL, UI_SET_REPEAT_MS, 60, 300, 20, " ms"),
+	LIST(TRN("Up/Down on Home"), NULL, UI_SET_UPDOWN_HOME, v_updown, n_updown),
+#if CONFIG_KEY_ASSIGN
 	KEY_ROWS(0), KEY_ROWS(1), KEY_ROWS(2), KEY_ROWS(3), KEY_ROWS(4), KEY_ROWS(5), KEY_ROWS(6), KEY_ROWS(7),
 	KEY_ROWS(8),
 #endif
 };
+#endif
+#if !CONFIG_C4FM
 static const set_item_t s_my_radio[] = {
 	ACTION(TRN("DMR ID and name"), "callsign", SA_MY_RADIO),
 	// Also in Advanced, where users didn't look for it
 	ACTION(TRN("About"), "firmware version release build date", SA_FIRMWARE),
 };
+#endif
 #if CONFIG_C4FM
 // The mode menus (docs/spec/c4fm.md 6): Menu > FM / DMR / C4FM open these pages, Settings keeps what all modes share.
 // A page's ACTION rows open the mode's screens and sub-pages
@@ -5888,43 +5911,6 @@ static const char *const n_roger[] = { TRN("Off"), TRN("Classic"), TRN("Beep"), 
 	TRN("Bee-boo"), TRN("Morse K"), TRN("Morse R"), TRN("Quindar") };
 _Static_assert(sizeof v_roger / sizeof v_roger[0] == ROGER_COUNT + 1u, "Off and each roger sound");
 _Static_assert(sizeof n_roger / sizeof n_roger[0] == ROGER_COUNT + 1u, "Off and each roger sound");
-// Menu > FM: the receiver's rules, then the channel or VFO in use (the rows Quick has, in one place)
-static const set_item_t s_fm[] = {
-	NUMBER(TRN("Default squelch"), "FM squelch level", UI_SET_SQUELCH, 0, 9, 1, NULL),
-	LIST(TRN("Busy lockout"), "FM BCL busy channel lockout", UI_SET_FM_BCL, v_bcl, n_bcl),
-#if CONFIG_FM_TX_TONES
-	LIST(TRN("Roger sound"), "FM roger beep end of transmission tone", UI_SET_FM_ROGER, v_roger, n_roger),
-#endif
-	TOGGLE(TRN("Wide 25 kHz"), "FM bandwidth channel spacing", UI_SET_CH_WIDE),
-	NUMBER(TRN("RX tone"), "FM CTCSS DCS receive subtone", UI_SET_CH_RX_TONE, 0, TONES_PICKER_COUNT - 1, 1, NULL),
-	NUMBER(TRN("TX tone"), "FM CTCSS DCS transmit subtone", UI_SET_CH_TX_TONE, 0, TONES_PICKER_COUNT - 1, 1, NULL),
-	NUMBER(TRN("Repeater offset"), "FM shift split duplex VFO", UI_SET_VFO_OFFSET, -10000, 10000, 25, " kHz"),
-};
-// Menu > DMR: its screens, its identity, its rules
-static const set_item_t s_dmr[] = {
-	ACTION(TRN("Last caller"), "DMR call back", SA_LAST_CALLER),
-	ACTION(TRN("Contacts"), "DMR talkgroups", SA_CONTACTS),
-#if CONFIG_DMR_SMS
-	ACTION(TRN("Messages"), "DMR SMS text", SA_MESSAGES),
-#endif
-	ACTION(TRN("Recent"), "DMR calls heard", SA_RECENT),
-	ACTION(TRN("DMR ID and name"), "DMR callsign radio ID", SA_MY_RADIO),
-	NUMBER(TRN("Reply window"), "DMR", UI_SET_REPLY_S, 0, 30, 1, " s"),
-	TOGGLE(TRN("Monitor by default"), "DMR digital monitor promiscuous hear all", UI_SET_HEAR_ALL_DEFAULT),
-	TOGGLE(TRN("Show talker alias"), "DMR", UI_SET_ALIAS_SHOW),
-	TOGGLE(TRN("Talk permit tone"), "DMR", UI_SET_TALK_PERMIT),
-	ACTION(TRN("Data and messages"), "DMR radio check call alert SMS format", SA_DMR_DATA),
-	LIST(TRN("Roger sound"), "DMR roger beep end of transmission tone", UI_SET_FM_ROGER, v_roger, n_roger),
-};
-// Menu > C4FM
-static const set_item_t s_c4fm[] = {
-	ACTION(TRN("Wires-X"), "C4FM node room connect repeater", SA_WIRESX),
-	ACTION(TRN("Last heard"), "C4FM stations calls heard", SA_C4FM_HEARD),
-	NUMBER(TRN("DG-ID"), "C4FM DGID digital group Fusion", UI_SET_C4FM_DGID, 0, 99, 1, NULL),
-	ACTION(TRN("Callsign"), "C4FM callsign", SA_C4FM_CALL),
-	ACTION(TRN("Advanced"), "C4FM deviation preamble FT-70D test tone debug", SA_C4FM_ADV),
-	LIST(TRN("Roger sound"), "C4FM roger beep end of transmission tone", UI_SET_FM_ROGER, v_roger, n_roger),
-};
 // Menu > C4FM > Wires-X (and # on Home in C4FM): the node's status, its room; connect and disconnect. Opening it asks
 // the node for its status (a short transmission)
 static const set_item_t s_wx[] = {
@@ -5945,34 +5931,8 @@ static const set_item_t s_c4fm_adv[] = {
 	TOGGLE(TRN("Send as FT-70D"), "C4FM radio ID Wires-X fields", UI_SET_C4FM_FT70D),
 	TOGGLE(TRN("Test tone"), "C4FM vocoder tone instead of mic debug", UI_SET_C4FM_TEST_TONE),
 };
-// Settings > Digital voice: the vocoder's, DMR and C4FM alike
-static const set_item_t s_voice[] = {
-	NUMBER(TRN("Mic gain"), "microphone DMR C4FM", UI_SET_MIC_GAIN, 0, 10, 1, NULL),
-	TOGGLE(TRN("Mic AGC"), "automatic gain level DMR C4FM", UI_SET_MIC_AGC),
-	TOGGLE(TRN("Mic noise reduction"), "noise suppression background DMR C4FM", UI_SET_NOISE_REDUCTION),
-	NUMBER(TRN("Voice volume"), "DMR C4FM digital decoded voice level", UI_SET_VOICE_RX_GAIN, -6, 12, 2, " dB"),
-};
-// Settings > Talk & listen: what every mode shares
-static const set_item_t s_talk_common[] = {
-	LIST(TRN("TX timeout"), "TOT", UI_SET_TOT_S, v_tot, n_tot),
-#if CONFIG_VFO
-	LIST(TRN("VFO step"), "frequency tuning channel spacing", UI_SET_VFO_STEP, v_step, n_step),
 #endif
-#if CONFIG_VFO && CONFIG_BCAST_FM
-	LIST(TRN("FM broadcast step"), "VFO tuning radio station 200 kHz odd", UI_SET_BCAST_STEP, v_bcast_step, n_bcast_step),
-#endif
-#if CONFIG_DUAL_WATCH
-	TOGGLE(TRN("Dual watch talk back"), "reply other channel A B", UI_SET_DUAL_TALK_BACK),
-	LIST(TRN("Dual watch delay"), "resume wait reply A B", UI_SET_DUAL_DELAY_MS, v_dual_wait, n_dual_wait),
-#endif
-#if CONFIG_SFR
-	LIST(TRN("SFR receive"), "single frequency repeater both copies dual-path rx", UI_SET_SFR_RX, v_sfrrx, n_sfrrx),
-#endif
-#if CONFIG_SFR_CWID
-	LIST(TRN("SFR CW ID"), "single frequency repeater morse callsign identify", UI_SET_SFR_CWID, v_sfrcwid, n_sfrcwid),
-#endif
-};
-#endif
+#if !CONFIG_C4FM
 static const set_item_t s_advanced[] = {
 	ACTION(TRN("About"), "firmware version license authors", SA_FIRMWARE),
 	ACTION(TRN("Codeplug"), NULL, SA_CODEPLUG),
@@ -5994,6 +5954,7 @@ static const set_item_t s_advanced[] = {
 	ACTION("Hardware", "board revision", SA_HARDWARE),
 #endif
 };
+#endif
 
 #if CONFIG_C4FM
 // Settings > Tactical: the red screen and its own backlight, dark LEDs, and the tactical tones (each on its own, all off
@@ -6005,40 +5966,159 @@ static const char *const n_tac_bright[] = { TRN("Normal"), "10%", "20%", "30%", 
 static const int16_t v_tac_style[] = { 0, 1, 2, 3 };
 static const char *const n_tac_style[] = { TRN("Deep"), TRN("Bloop"), TRN("Low chirp"), TRN("High chirp") };
 static const set_item_t s_tactical[] = {
-	TOGGLE(TRN("Tactical mode"), "red screen night vision military", UI_SET_TAC_MODE),
+	TOGGLE(TRN("Everything tactical"), "tactical all at once red LEDs tones", UI_SET_TAC_ALL),
+	TOGGLE(TRN("Red screen"), "tactical mode red screen night vision military", UI_SET_TAC_MODE),
 	LIST(TRN("Red brightness"), "tactical backlight night", UI_SET_TAC_BRIGHT, v_tac_bright, n_tac_bright),
 	TOGGLE(TRN("LEDs off"), "tactical dark light TX RX lamp", UI_SET_TAC_LEDS),
+};
+// Settings > Roger & tones: every transmit and tactical tone in one place (one setting each, every mode)
+static const set_item_t s_tones[] = {
+#if CONFIG_FM_TX_TONES
+	LIST(TRN("Roger sound"), "roger beep end of transmission tone FM DMR C4FM", UI_SET_FM_ROGER, v_roger, n_roger),
+#endif
+	TOGGLE(TRN("Roger in FM"), "roger beep per mode analog", UI_SET_ROGER_FM),
+	TOGGLE(TRN("Roger in DMR"), "roger beep per mode digital", UI_SET_ROGER_DMR),
+	TOGGLE(TRN("Roger in C4FM"), "roger beep per mode Fusion", UI_SET_ROGER_C4FM),
 	TOGGLE(TRN("Key-up tone"), "tactical military PTT press chirp", UI_SET_TAC_KEY),
 	TOGGLE(TRN("Unkey tone"), "tactical military PTT release chirp", UI_SET_TAC_UNKEY),
 	TOGGLE(TRN("RX tone"), "tactical military receive start blip", UI_SET_TAC_RX),
+	TOGGLE(TRN("RX end tone"), "tactical military receive end over blip", UI_SET_TAC_RXEND),
 	LIST(TRN("Tone style"), "tactical sound deep bloop chirp", UI_SET_TAC_STYLE, v_tac_style, n_tac_style),
+	TOGGLE(TRN("Tones in FM"), "tactical tones per mode analog", UI_SET_TONES_FM),
+	TOGGLE(TRN("Tones in DMR"), "tactical tones per mode digital", UI_SET_TONES_DMR),
+	TOGGLE(TRN("Tones in C4FM"), "tactical tones per mode Fusion", UI_SET_TONES_C4FM),
+};
+// Menu > This channel: what belongs to the channel or VFO in use (rows of another mode are dimmed)
+static const set_item_t s_channel[] = {
+	TOGGLE(TRN("Wide 25 kHz"), "FM bandwidth channel spacing", UI_SET_CH_WIDE),
+	NUMBER(TRN("RX tone"), "FM CTCSS DCS receive subtone", UI_SET_CH_RX_TONE, 0, TONES_PICKER_COUNT - 1, 1, NULL),
+	NUMBER(TRN("TX tone"), "FM CTCSS DCS transmit subtone", UI_SET_CH_TX_TONE, 0, TONES_PICKER_COUNT - 1, 1, NULL),
+	NUMBER(TRN("Repeater offset"), "FM shift split duplex VFO", UI_SET_VFO_OFFSET, -10000, 10000, 25, " kHz"),
+	NUMBER(TRN("DG-ID"), "C4FM DGID digital group Fusion", UI_SET_C4FM_DGID, 0, 99, 1, NULL),
+};
+// Menu > Calls: who was heard and who to call, every mode
+static const set_item_t s_calls[] = {
+	ACTION(TRN("Last caller"), "DMR call back reply", SA_LAST_CALLER),
+	ACTION(TRN("Recent DMR"), "DMR calls heard", SA_RECENT),
+	ACTION(TRN("Last heard C4FM"), "C4FM stations calls heard Fusion", SA_C4FM_HEARD),
+	ACTION(TRN("Contacts"), "DMR talkgroups", SA_CONTACTS),
+#if CONFIG_DMR_SMS
+	ACTION(TRN("Messages"), "DMR SMS text", SA_MESSAGES),
+#endif
+};
+// Settings > Talk & voice: transmitting and the digital voice, every mode
+static const set_item_t s_talk_voice[] = {
+	LIST(TRN("TX timeout"), "TOT", UI_SET_TOT_S, v_tot, n_tot),
+	NUMBER(TRN("Mic gain"), "microphone DMR C4FM", UI_SET_MIC_GAIN, 0, 10, 1, NULL),
+	TOGGLE(TRN("Mic AGC"), "automatic gain level DMR C4FM", UI_SET_MIC_AGC),
+	TOGGLE(TRN("Mic noise reduction"), "noise suppression background DMR C4FM", UI_SET_NOISE_REDUCTION),
+	NUMBER(TRN("Voice volume"), "DMR C4FM digital decoded voice level", UI_SET_VOICE_RX_GAIN, -6, 12, 2, " dB"),
+};
+// Settings > My radio: who the radio is on the air
+static const set_item_t s_identity[] = {
+	ACTION(TRN("DMR ID and name"), "callsign radio ID", SA_MY_RADIO),
+	ACTION(TRN("C4FM callsign"), "C4FM Fusion callsign", SA_C4FM_CALL),
+};
+// Settings > Modes: each mode's own rules, named by mode
+static const set_item_t s_modes[] = {
+	NUMBER(TRN("FM squelch"), "FM squelch level default", UI_SET_SQUELCH, 0, 9, 1, NULL),
+	LIST(TRN("FM busy lockout"), "FM BCL busy channel lockout", UI_SET_FM_BCL, v_bcl, n_bcl),
+	NUMBER(TRN("DMR reply window"), "DMR", UI_SET_REPLY_S, 0, 30, 1, " s"),
+	TOGGLE(TRN("DMR monitor"), "DMR digital monitor promiscuous hear all by default", UI_SET_HEAR_ALL_DEFAULT),
+	TOGGLE(TRN("DMR talker alias"), "DMR show talker alias", UI_SET_ALIAS_SHOW),
+	ACTION(TRN("DMR data and messages"), "DMR radio check call alert SMS format", SA_DMR_DATA),
+	NUMBER(TRN("C4FM TX deviation"), "C4FM modulation level", UI_SET_C4FM_TX_LEVEL, 70, 130, 5, "%"),
+	NUMBER(TRN("C4FM preamble"), "C4FM lead-in", UI_SET_C4FM_PREAMBLE, 100, 500, 100, " ms"),
+	TOGGLE(TRN("C4FM as FT-70D"), "C4FM radio ID Wires-X fields send", UI_SET_C4FM_FT70D),
+	TOGGLE(TRN("C4FM test tone"), "C4FM vocoder tone instead of mic debug", UI_SET_C4FM_TEST_TONE),
+};
+// Settings > Battery & keys
+static const set_item_t s_batt_keys[] = {
+	TOGGLE(TRN("Battery saver"), NULL, UI_SET_BATTERY_SAVER),
+	LIST(TRN("Auto power off"), NULL, UI_SET_AUTO_OFF_MIN, v_autooff, n_autooff),
+	NUMBER(TRN("Low battery warning"), NULL, UI_SET_LOW_BATTERY, 5, 30, 5, "%"),
+	LIST(TRN("Auto lock"), "keylock", UI_SET_AUTO_LOCK_S, v_lock, n_lock),
+	TOGGLE(TRN("PTT when locked"), NULL, UI_SET_PTT_LOCKED),
+	TOGGLE(TRN("Knob when locked"), "volume knob key lock", UI_SET_KNOB_WHEN_LOCKED),
+	NUMBER(TRN("Long press time"), NULL, UI_SET_LONG_PRESS_MS, 400, 1200, 100, " ms"),
+	NUMBER(TRN("Key repeat"), NULL, UI_SET_REPEAT_MS, 60, 300, 20, " ms"),
+	LIST(TRN("Up/Down on Home"), NULL, UI_SET_UPDOWN_HOME, v_updown, n_updown),
+#if CONFIG_KEY_ASSIGN
+	KEY_ROWS(0), KEY_ROWS(1), KEY_ROWS(2), KEY_ROWS(3), KEY_ROWS(4), KEY_ROWS(5), KEY_ROWS(6), KEY_ROWS(7),
+	KEY_ROWS(8),
+#endif
+};
+// Settings > Advanced: the radio's internals, and the rarely changed receive and tuning options
+static const set_item_t s_adv_c4fm[] = {
+	ACTION(TRN("About"), "firmware version license authors", SA_FIRMWARE),
+	ACTION(TRN("Codeplug"), NULL, SA_CODEPLUG),
+	ACTION(TRN("Diagnostics"), "debug", SA_DIAG),
+	ACTION(TRN("Factory reset"), "erase", SA_RESET),
+#if CONFIG_CRASH_SCREEN
+	ACTION(TRN("Crash log"), "crash report fault debug", SA_CRASH),
+#endif
+#if CONFIG_VFO
+	LIST(TRN("VFO step"), "frequency tuning channel spacing", UI_SET_VFO_STEP, v_step, n_step),
+#endif
+#if CONFIG_VFO && CONFIG_BCAST_FM
+	LIST(TRN("FM broadcast step"), "VFO tuning radio station 200 kHz odd", UI_SET_BCAST_STEP, v_bcast_step, n_bcast_step),
+#endif
+#if CONFIG_DUAL_WATCH
+	TOGGLE(TRN("Dual watch talk back"), "reply other channel A B", UI_SET_DUAL_TALK_BACK),
+	LIST(TRN("Dual watch delay"), "resume wait reply A B", UI_SET_DUAL_DELAY_MS, v_dual_wait, n_dual_wait),
+#endif
+#if CONFIG_SFR
+	LIST(TRN("SFR receive"), "single frequency repeater both copies dual-path rx", UI_SET_SFR_RX, v_sfrrx, n_sfrrx),
+#endif
+#if CONFIG_SFR_CWID
+	LIST(TRN("SFR CW ID"), "single frequency repeater morse callsign identify", UI_SET_SFR_CWID, v_sfrcwid, n_sfrcwid),
+#endif
+#if CONFIG_RX_EXT
+	TOGGLE(TRN("RX past bands"), "extended out of band receive range", UI_SET_RX_EXT),
+#endif
+#if CONFIG_REF_TRIM
+	NUMBER(TRN("Freq trim"), "frequency offset reference oscillator calibration ppm", UI_SET_REF_TRIM, -REF_TRIM_MAX_PPB,
+	       REF_TRIM_MAX_PPB, REF_TRIM_STEP_PPB, NULL),
+#endif
+#if RFOUNDRY_HWOPTS
+	ACTION("Hardware", "board revision", SA_HARDWARE),
+#endif
 };
 #endif
 
 #define GROUP(nm, a)		{ nm, nm, a, sizeof a / sizeof a[0] }
 #define GROUP_T(nm, t, a)	{ nm, t, a, sizeof a / sizeof a[0] }
 static const set_group_t groups[] = {
-	GROUP(TRN("Sound"), s_sound), GROUP(TRN("Display"), s_display),
 #if CONFIG_C4FM
-	GROUP_T(TRN("Talk & listen"), TRN("Talk & Listen"), s_talk_common),
-	GROUP(TRN("Digital voice"), s_voice),
+	// Settings, in this order (docs/spec/c4fm.md 6): every setting in one place
+	GROUP(TRN("Sound"), s_sound),
+	GROUP_T(TRN("Roger & tones"), TRN("Roger & Tones"), s_tones),
+	GROUP(TRN("Display"), s_display),
+	GROUP(TRN("Tactical"), s_tactical),
+	GROUP_T(TRN("Talk & voice"), TRN("Talk & Voice"), s_talk_voice),
+	GROUP_T(TRN("My radio"), TRN("My Radio"), s_identity),
+	GROUP(TRN("Modes"), s_modes),
+	GROUP(TRN("Location"), s_location),
+	GROUP_T(TRN("Battery & keys"), TRN("Battery & Keys"), s_batt_keys),
+	GROUP(TRN("Advanced"), s_adv_c4fm),
+	// Pages opened from elsewhere, not listed in Settings (settings_shown): Menu's This channel and Calls, Wires-X,
+	// DMR data, privacy
+	GROUP_T(TRN("This channel"), TRN("This Channel"), s_channel),
+	GROUP(TRN("Calls"), s_calls),
+	GROUP(TRN("Wires-X"), s_wx),
+	GROUP_T(TRN("DMR data"), TRN("DMR Data"), s_connections),
+	GROUP(TRN("Privacy"), s_privacy),
+};
 #else
+	GROUP(TRN("Sound"), s_sound), GROUP(TRN("Display"), s_display),
 	GROUP_T(TRN("Talk & listen"), TRN("Talk & Listen"), s_talk),
-#endif
 	GROUP(TRN("Privacy"), s_privacy),
 	GROUP(TRN("Location"), s_location), GROUP(TRN("Connections"), s_connections),
 	GROUP_T(TRN("Power saving"), TRN("Power Saving"), s_power),
 	GROUP(TRN("Keys"), s_keys), GROUP(TRN("Key lock"), s_lock),
 	GROUP_T(TRN("My radio"), TRN("My Radio"), s_my_radio), GROUP(TRN("Advanced"), s_advanced),
-#if CONFIG_C4FM
-	GROUP(TRN("Tactical"), s_tactical),
-	// The mode pages: last, not listed in Settings (settings_shown); Menu opens them
-	GROUP(TRN("FM"), s_fm), GROUP(TRN("DMR"), s_dmr), GROUP(TRN("C4FM"), s_c4fm),
-	GROUP_T(TRN("C4FM advanced"), TRN("C4FM Advanced"), s_c4fm_adv),
-	GROUP(TRN("Wires-X"), s_wx),
-	GROUP_T(TRN("DMR data"), TRN("DMR Data"), s_connections),
-#endif
 };
+#endif
 #define GROUPS	(sizeof groups / sizeof groups[0])
 
 uint8_t ui_set_group_count(void) { return GROUPS; }
@@ -6125,9 +6205,7 @@ static bool settings_shown(uint8_t g)
 {
 #if CONFIG_C4FM
 	const set_item_t *it = groups[g].items;
-	return it != s_fm && it != s_dmr && it != s_c4fm && it != s_c4fm_adv && it != s_wx && it != s_connections &&
-	       it != s_privacy &&
-	       it != s_location && it != s_my_radio;
+	return it != s_channel && it != s_calls && it != s_wx && it != s_connections && it != s_privacy;
 #else
 	(void)g;
 	return true;
@@ -6163,9 +6241,14 @@ static uint8_t group_of(const set_item_t *items)
 	return 0;
 }
 
-static void open_mode_page(uint8_t mode)
+static void open_channel_page(void)
 {
-	ui_push(SCR_GROUP, group_of(mode == RADIO_MODE_FM ? s_fm : mode == RADIO_MODE_DMR ? s_dmr : s_c4fm));
+	ui_push(SCR_GROUP, group_of(s_channel));
+}
+
+static void open_calls_page(void)
+{
+	ui_push(SCR_GROUP, group_of(s_calls));
 }
 
 // Wires-X: ask the node for its status and open the page (# on Home in C4FM, Menu > C4FM > Wires-X)

@@ -316,7 +316,7 @@ void hrc_c4fm_enter(void)
 void hrc_c4fm_leave(void)
 {
 	hrc7000_c4fm_tx_stop(&eng);
-	hrc_fm_rx_stop();
+	hrc_fm_rx_stop(HRC_FM_RX_C4FM);
 	irqs_enable(false);
 	c4fm_on = false;
 	rf_on_rx = false;
@@ -324,12 +324,12 @@ void hrc_c4fm_leave(void)
 
 static bool c4fm_rx_start(void)
 {
-	return c4fm_on && hrc_fm_rx_start();
+	return c4fm_on && hrc_fm_rx_start(HRC_FM_RX_C4FM);
 }
 
 static void c4fm_rx_stop(void)
 {
-	hrc_fm_rx_stop();
+	hrc_fm_rx_stop(HRC_FM_RX_C4FM);
 }
 
 static bool c4fm_tx_start(void)
@@ -380,7 +380,7 @@ static void c4fm_stats(hal_c4fm_stats_t *out)
 
 const hal_c4fm_t hrc_c4fm = {
 	.rx_rate_hz = 8000,
-	.rx_start = c4fm_rx_start, .rx_read = hrc_fm_rx_read, .rx_stop = c4fm_rx_stop,
+	.rx_start = c4fm_rx_start, .rx_read = hrc_fm_rx_read_c4fm, .rx_stop = c4fm_rx_stop,
 	.tx_start = c4fm_tx_start, .tx_space = c4fm_tx_space, .tx_queued = c4fm_tx_queued, .tx_write = c4fm_tx_write,
 	.tx_stop = c4fm_tx_stop, .tx_on_air = c4fm_tx_on_air, .set_tx_level = c4fm_set_tx_level,
 	.stats = c4fm_stats,

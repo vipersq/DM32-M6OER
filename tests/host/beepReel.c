@@ -110,7 +110,7 @@ static const step_t steps[] = {
 	{ "Tactical tones: key-up, unkey, a reception", "pttdown", "TAC_KEY", false, false, 300 },
 	{ NULL, "pttup", "TAC_UNKEY", false, false, 300 },
 	{ NULL, "fmrx", "TAC_RX", false, false, 500 },
-	{ NULL, "fmrxend", NULL, false, true, 300 },
+	{ NULL, "fmrxend", "TAC_RXEND", false, false, 300 },
 };
 #define STEPS	((int)(sizeof steps / sizeof steps[0]))
 

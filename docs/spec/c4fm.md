@@ -186,22 +186,21 @@ receiver: the connect reply (the room) and a room list of five blocks.
 | Power | every level of the board, as in DMR |
 | Channel editor | Mode cycles FM -> DMR -> C4FM; a C4FM channel shows DG-ID (0-99) in place of DMR's and FM's rows. The web codeplug editor (`site/static/js/editor`) has the same mode and field |
 | Home | talk row: our callsign and DG-ID, or the caller's while receiving; chips: DN, power, 12.5k; activity: the caller and the mode heard, then "Last heard" |
-| Build | `CONFIG_C4FM` (needs `CONFIG_DMR`); `make VARIANT=c4fm`: FM, DMR (voice, channels, contacts, SMS) and C4FM, without IP, the cable's network services, the hotspot and the advanced DMR services |
+| Build | `CONFIG_C4FM` (needs `CONFIG_DMR`); `make VARIANT=c4fm`: FM, DMR (voice, channels, contacts, SMS), C4FM and APRS, without IP, the cable's network services, the hotspot and the advanced DMR services. APRS and the C4FM receiver share the HR_C7000's FM audio copy one at a time, C4FM first (`platform/hrc7000/fm_rx_audio.h`) |
 
-The menus in the C4FM build (`core/ui/ui_menus.c`, `ui_modes.c`):
+The menus in the C4FM build (`core/ui/ui_menus.c`), by what one does; every setting has one place:
 
 | Menu row | Opens |
 |---|---|
 | Switch to VFO / Memory | toggles, back to Home |
 | Zones, Channels | as in RadioFoundry |
-| FM | default squelch, busy lockout, roger sound; the channel or VFO in use (FM only): 25 kHz, RX / TX tone (CTCSS / DCS), the VFO's repeater offset |
-| DMR | last caller, contacts, messages, recent, DMR ID and name, reply window, monitor, talker alias, talk permit tone, Data and messages (radio checks, call alerts, SMS format) |
-| C4FM | Wires-X (5.1), Last heard (latest 10: callsign, radio ID, DG-ID, age), DG-ID, Callsign, Advanced (TX deviation 70-130 %, preamble 100-500 ms, Send as FT-70D, test tone) |
-| Tools | as in RadioFoundry |
-| Settings | the shared groups: Sound, Display, Talk & listen (TX timeout, VFO step), Digital voice (mic gain, AGC, noise reduction, voice volume), Power saving, Keys, Key lock, Advanced |
+| This channel | the channel or VFO in use: 25 kHz, RX / TX tone (CTCSS / DCS), the VFO's repeater offset, DG-ID; rows of another mode dimmed. The row shows the mode |
+| Calls | Last caller, Recent DMR, Last heard C4FM, Contacts, Messages (the unread count on the row) |
+| Wires-X | the Wires-X page (5.1) on a C4FM channel, else "C4FM only" |
+| Tools | the tools this build has, numbered in a row (Scan, Position, APRS, Battery); Diagnostics is in Settings > Advanced |
+| Settings | Sound; Roger & tones (roger sound, key-up / unkey / RX tones, their style); Display; Tactical (everything tactical at once, red screen, red brightness, LEDs off); Talk & voice (TX timeout, mic gain / AGC / noise reduction, voice volume); My radio (DMR ID and name, C4FM callsign); Modes (FM squelch and busy lockout, DMR reply window / monitor / talker alias / data and messages, C4FM TX deviation / preamble / FT-70D / test tone); Location; Battery & keys; Advanced (About, codeplug, diagnostics, reset, crash log, VFO and broadcast steps, dual watch, SFR, RX past bands, frequency trim) |
 
-The mode in use shows "in use" on its row. `tests/host/c4fmUiSmoke.sh` opens every page at each display class in the
-simulator built with `CONFIG_C4FM`.
+`tests/host/c4fmUiSmoke.sh` opens every page at each display class in the simulator built with `CONFIG_C4FM`.
 
 ## 7. The board's modem
 
@@ -314,4 +313,20 @@ no-beep channel. Host test: radioFeaturesTest `test_tactical_tones`.
 
 `CONFIG_C4FM_CAPTURE` (off by default) holds the bench capture's 2 s input ring (32 KB): off, the frame records stay
 and the ring is one sample. The C4FM build's RAM went from 94 % to 79 % with it off.
+
+## Roger & tones per mode, the reception end tone
+
+Settings > Roger & tones has, beside the roger sound and the tactical tones, a switch per mode for each: Roger in FM /
+DMR / C4FM and Tones in FM / DMR / C4FM (`radio_settings_t.roger_off`, `tones_off`: a bit per `radio_mode_t`, set =
+off; `settings_t.tac_modes`; all on by default). The mode is the channel's in use. RX end tone (`tac_rxend`,
+`BEEP_TAC_RXEND`, in every style) sounds when a reception ends (the squelch or the call closing), not when our own
+key-up cuts it. Everything tactical includes it. Host tests: radioFeaturesTest `test_tactical_tones` (FM),
+radioCoreTest `test_dmr_roger` (Roger in DMR off).
+
+## APRS beside C4FM
+
+The C4FM variant has APRS on again (Tools > APRS, Settings > Location). The HR_C7000 copies its FM audio to one user
+at a time (`platform/hrc7000/fm_rx_audio.c`, an owner per start): APRS on the APRS frequency in FM, the C4FM receiver
+on C4FM channels. C4FM's start takes the copy from APRS (a channel change before APRS's next poll lets go); APRS's read
+and stop do nothing while C4FM has it, its start fails. Host test: `fmRxShareTest`. RAM with APRS: 86 %.
 

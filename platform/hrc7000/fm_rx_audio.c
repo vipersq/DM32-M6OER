@@ -17,6 +17,7 @@
 
 static hrc7000_t *modem;
 static int16_t *ring;
+static uint8_t owner;	// HRC_FM_RX_*, 0 = none (task level)
 static volatile uint16_t head, tail;	// free running, in samples: the interrupt moves head, the task tail
 static volatile uint32_t halves, dropped;
 
@@ -37,8 +38,23 @@ void hrc_fm_rx_attach(hrc7000_t *m)
 	modem = m;
 }
 
-bool hrc_fm_rx_start(void)
+static void stop_now(void)
 {
+	if (ring == NULL) {
+		return;
+	}
+	hrc7000_fm_rx_audio_irq(modem, false);
+	hrc_dmr_fm_rx_hook(NULL);	// after this the interrupt no longer touches the ring
+	vPortFree(ring);
+	ring = NULL;
+	owner = 0;
+}
+
+bool hrc_fm_rx_start(uint8_t who)
+{
+	if (ring != NULL && owner == HRC_FM_RX_APRS && who == HRC_FM_RX_C4FM) {
+		stop_now();	// C4FM first: APRS's next poll finds it gone and lets go
+	}
 	if (modem == NULL || ring != NULL) {
 		return false;
 	}
@@ -53,23 +69,20 @@ bool hrc_fm_rx_start(void)
 		return false;
 	}
 	hrc7000_fm_rx_audio_irq(modem, true);
+	owner = who;
 	return true;
 }
 
-void hrc_fm_rx_stop(void)
+void hrc_fm_rx_stop(uint8_t who)
 {
-	if (ring == NULL) {
-		return;
+	if (owner == who) {
+		stop_now();
 	}
-	hrc7000_fm_rx_audio_irq(modem, false);
-	hrc_dmr_fm_rx_hook(NULL);	// after this the interrupt no longer touches the ring
-	vPortFree(ring);
-	ring = NULL;
 }
 
-uint16_t hrc_fm_rx_read(int16_t *buf, uint16_t max)
+static uint16_t rx_read(uint8_t who, int16_t *buf, uint16_t max)
 {
-	if (ring == NULL) {
+	if (ring == NULL || owner != who) {
 		return 0;
 	}
 	uint16_t t = tail, n = (uint16_t)(head - t);
@@ -82,6 +95,16 @@ uint16_t hrc_fm_rx_read(int16_t *buf, uint16_t max)
 	hrc_barrier();
 	tail = (uint16_t)(t + n);
 	return n;
+}
+
+uint16_t hrc_fm_rx_read_aprs(int16_t *buf, uint16_t max)
+{
+	return rx_read(HRC_FM_RX_APRS, buf, max);
+}
+
+uint16_t hrc_fm_rx_read_c4fm(int16_t *buf, uint16_t max)
+{
+	return rx_read(HRC_FM_RX_C4FM, buf, max);
 }
 
 void hrc_fm_rx_stats(uint32_t *h, uint32_t *d)

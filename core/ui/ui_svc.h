@@ -371,6 +371,11 @@ typedef enum {
 	UI_SET_TAC_RX,
 	UI_SET_TAC_LEDS,	// Settings > Tactical: the LEDs off (radio_settings_t.leds_off), 1 off, 0 as usual
 	UI_SET_TAC_STYLE,	// ... the tactical tones' style, 0..BEEP_TAC_STYLES - 1 (radio_settings_t.tac_style)
+	UI_SET_TAC_RXEND,	// ... the reception end tone, 1 on
+	// Settings > Roger & tones: the tactical tones and the roger sound per mode, 1 on (radio_settings_t.tones_off /
+	// roger_off, a bit per radio_mode_t, set = off): UI_SET_TONES_FM + mode, UI_SET_ROGER_FM + mode
+	UI_SET_TONES_FM, UI_SET_TONES_DMR, UI_SET_TONES_C4FM,
+	UI_SET_ROGER_FM, UI_SET_ROGER_DMR, UI_SET_ROGER_C4FM,
 	UI_SET_CH_WIDE,
 	UI_SET_CH_RX_TONE,
 	UI_SET_CH_TX_TONE,
@@ -379,6 +384,7 @@ typedef enum {
 	// (0: the normal brightness)
 	UI_SET_TAC_MODE,
 	UI_SET_TAC_BRIGHT,
+	UI_SET_TAC_ALL,		// Settings > Tactical > Everything tactical: the red screen, LEDs off and the three tones at once
 	UI_SET_COUNT
 } ui_setting_t;
 

@@ -45,21 +45,25 @@ static const beep_seg_t p_sweep[] = { { 0, 400 }, { BEEP_HZ_SWEEP, 4000 }, { 0, 
 static const beep_seg_t p_tac_key[] = { { 600, 40 }, { 900, 60 } };		// deep: a rising two-note
 static const beep_seg_t p_tac_unkey[] = { { 900, 50 }, { 600, 80 } };		// ... falling
 static const beep_seg_t p_tac_rx[] = { { 500, 60 } };
+static const beep_seg_t p_tac_rxend[] = { { 700, 40 }, { 500, 70 } };
 static const beep_seg_t p_tac_key_b[] = { { 750, 30 }, { 0, 10 }, { 750, 70 } };	// bloop
 static const beep_seg_t p_tac_unkey_b[] = { { 520, 120 } };
 static const beep_seg_t p_tac_rx_b[] = { { 650, 40 }, { 0, 20 }, { 650, 40 } };
+static const beep_seg_t p_tac_rxend_b[] = { { 520, 90 } };
 static const beep_seg_t p_tac_key_c[] = { { 550, 25 }, { 650, 25 }, { 750, 25 }, { 850, 25 } };	// low chirp
 static const beep_seg_t p_tac_unkey_c[] = { { 850, 25 }, { 750, 25 }, { 650, 25 }, { 550, 25 } };
 static const beep_seg_t p_tac_rx_c[] = { { 600, 50 } };
+static const beep_seg_t p_tac_rxend_c[] = { { 750, 25 }, { 650, 25 }, { 550, 25 } };
 static const beep_seg_t p_tac_key_h[] = { { 2000, 30 }, { 0, 15 }, { 2500, 45 } };	// high chirp
 static const beep_seg_t p_tac_unkey_h[] = { { 2500, 30 }, { 0, 15 }, { 1700, 55 } };
 static const beep_seg_t p_tac_rx_h[] = { { 1100, 35 }, { 1500, 45 } };
+static const beep_seg_t p_tac_rxend_h[] = { { 1500, 35 }, { 1100, 45 } };
 
 #define PAT(p)	{ p, sizeof(p) / sizeof(p[0]) }
 static const struct {
 	const beep_seg_t *segs;
 	uint8_t count;
-} patterns[BEEP_COUNT + 3 * (BEEP_TAC_STYLES - 1)] = {
+} patterns[BEEP_COUNT + BEEP_TAC_EVENTS * (BEEP_TAC_STYLES - 1)] = {
 	[BEEP_KEY] = PAT(p_key),
 	[BEEP_ERROR] = PAT(p_error),
 	[BEEP_TX_PERMIT] = PAT(p_permit),
@@ -76,10 +80,14 @@ static const struct {
 	[BEEP_TAC_KEY] = PAT(p_tac_key),
 	[BEEP_TAC_UNKEY] = PAT(p_tac_unkey),
 	[BEEP_TAC_RX] = PAT(p_tac_rx),
-	// The other styles' sets past the table's own entries, in event order (key-up, unkey, reception)
+	[BEEP_TAC_RXEND] = PAT(p_tac_rxend),
+	// The other styles' sets past the table's own entries, in event order (key-up, unkey, reception, its end)
 	[BEEP_COUNT + 0] = PAT(p_tac_key_b), [BEEP_COUNT + 1] = PAT(p_tac_unkey_b), [BEEP_COUNT + 2] = PAT(p_tac_rx_b),
-	[BEEP_COUNT + 3] = PAT(p_tac_key_c), [BEEP_COUNT + 4] = PAT(p_tac_unkey_c), [BEEP_COUNT + 5] = PAT(p_tac_rx_c),
-	[BEEP_COUNT + 6] = PAT(p_tac_key_h), [BEEP_COUNT + 7] = PAT(p_tac_unkey_h), [BEEP_COUNT + 8] = PAT(p_tac_rx_h),
+	[BEEP_COUNT + 3] = PAT(p_tac_rxend_b),
+	[BEEP_COUNT + 4] = PAT(p_tac_key_c), [BEEP_COUNT + 5] = PAT(p_tac_unkey_c), [BEEP_COUNT + 6] = PAT(p_tac_rx_c),
+	[BEEP_COUNT + 7] = PAT(p_tac_rxend_c),
+	[BEEP_COUNT + 8] = PAT(p_tac_key_h), [BEEP_COUNT + 9] = PAT(p_tac_unkey_h), [BEEP_COUNT + 10] = PAT(p_tac_rx_h),
+	[BEEP_COUNT + 11] = PAT(p_tac_rxend_h),
 };
 _Static_assert(BEEP_TAC_STYLES == 4, "a set past the table per style but the first");
 
@@ -94,8 +102,8 @@ void beep_tac_style(uint8_t style)
 static uint8_t pattern_of(beep_t b)
 {
 	uint8_t st = tac_style;
-	if (b >= BEEP_TAC_KEY && b <= BEEP_TAC_RX && st != 0 && st < BEEP_TAC_STYLES)
-		return (uint8_t)(BEEP_COUNT + 3u * (st - 1u) + (b - BEEP_TAC_KEY));
+	if (b >= BEEP_TAC_KEY && b <= BEEP_TAC_RXEND && st != 0 && st < BEEP_TAC_STYLES)
+		return (uint8_t)(BEEP_COUNT + BEEP_TAC_EVENTS * (st - 1u) + (b - BEEP_TAC_KEY));
 	return (uint8_t)b;
 }
 

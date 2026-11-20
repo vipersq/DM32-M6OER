@@ -246,6 +246,8 @@ typedef struct {
 	uint8_t tac_flags;		// SETTINGS_TAC_* (tactical tones, LEDs off; 0 = all off)
 	uint8_t tac_ui;			// SETTINGS_TACUI_* (Settings > Tactical; 0 = off)
 	uint8_t tac_bright;		// the backlight in tactical mode, 10-100 %; 0 = the normal brightness
+	uint8_t tac_modes;		// SETTINGS_TACM_*: the tones and the roger sound off in a mode (0 = on in every mode)
+	uint8_t reserved_rs[3];		// 0
 } settings_t;
 
 // Pages: settings_t is stored as records of SETTINGS_PAGE_BYTES each (settings-store.md 2.1). Only the pages its size
@@ -384,6 +386,10 @@ static inline void settings_set_crash_contact(settings_t *s, uint16_t num)
 #define SETTINGS_TAC_LEDS_OFF		0x08u	// the TX / RX LEDs stay dark
 #define SETTINGS_TAC_STYLE_SHIFT	4	// bits 4-5: the tactical tones' style (beep.h BEEP_TAC_STYLES; 0 deep)
 #define SETTINGS_TAC_STYLE_MASK		0x30u
+#define SETTINGS_TAC_RXEND		0x40u	// the reception end tone
+// tac_modes: bit (1 << radio_mode_t) of the low nibble, the tactical tones off in that mode; of the high, the roger
+#define SETTINGS_TACM_TONES_SHIFT	0
+#define SETTINGS_TACM_ROGER_SHIFT	4
 // tac_ui
 #define SETTINGS_TACUI_RED		0x01u	// tactical mode: the screen in shades of red
 // settings_t.rpt_beacon (taken with the roam_ fields)

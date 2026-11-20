@@ -288,6 +288,14 @@ int32_t ui_svc_setting_get(uint8_t id)
 	case UI_SET_TAC_BRIGHT:
 		settings_read(&st);
 		return st.tac_bright <= 100 ? st.tac_bright : 0;
+	case UI_SET_TAC_ALL: {	// on when every part is
+		static const uint8_t parts[] = { UI_SET_TAC_MODE, UI_SET_TAC_LEDS, UI_SET_TAC_KEY, UI_SET_TAC_UNKEY, UI_SET_TAC_RX,
+						 UI_SET_TAC_RXEND };
+		for (unsigned i = 0; i < sizeof parts; i++)
+			if (ui_svc_setting_get(parts[i]) == 0)
+				return 0;
+		return 1;
+	}
 	case UI_SET_ACCENT:
 		settings_read(&st);
 		return st.accent & SETTINGS_ACCENT_COLOR;
@@ -497,6 +505,14 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 		st->tac_ui = (uint8_t)(value != 0 ? st->tac_ui | SETTINGS_TACUI_RED : st->tac_ui & ~SETTINGS_TACUI_RED);
 		settings_end(hal_millis());
 		return true;
+	case UI_SET_TAC_ALL: {	// each part set as its own row sets it
+		static const uint8_t parts[] = { UI_SET_TAC_LEDS, UI_SET_TAC_KEY, UI_SET_TAC_UNKEY, UI_SET_TAC_RX, UI_SET_TAC_RXEND,
+						 UI_SET_TAC_MODE };
+		bool ok = true;
+		for (unsigned i = 0; i < sizeof parts; i++)
+			ok = ui_svc_setting_set(parts[i], value != 0) && ok;
+		return ok;
+	}
 	case UI_SET_TAC_BRIGHT:
 		st = settings_begin();
 		st->tac_bright = (uint8_t)(value <= 0 ? 0 : value > 100 ? 100 : value < 10 ? 10 : value);

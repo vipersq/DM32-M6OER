@@ -81,6 +81,9 @@ static void cw_cancel(radio_sm_t *sm);
 #include "position/position.h"		// our position for DMR GPS Info and LRRP (docs/spec/position.md)
 #endif
 
+static bool tones_here(const radio_sm_t *sm);	// Settings > Roger & tones, per mode (below)
+static bool roger_here(const radio_sm_t *sm);
+
 // The radio's own DMR ID when the codeplug's general settings hold none (build value; 0 = refuse DMR transmit)
 #ifndef RADIO_DMR_ID_DEFAULT
 #define RADIO_DMR_ID_DEFAULT	0
@@ -4264,7 +4267,7 @@ static void ptt_down(radio_sm_t *sm, uint32_t now_ms)
 #if CONFIG_BEEP
 	// Tactical key tone: played first, the key-up waits for it (tac_service). Not when the transmission is already on
 	// (a re-press during its tail), on a no-beep channel or while the host sends its own audio
-	if (sm->set.tac_key && !sm->tac_pass && !sm->tac_hold && sm->view.state != RS_TX && !sm->view.ch.no_beep &&
+	if (sm->set.tac_key && tones_here(sm) && !sm->tac_pass && !sm->tac_hold && sm->view.state != RS_TX && !sm->view.ch.no_beep &&
 	    !sm->host_audio) {
 		beep(sm, BEEP_TAC_KEY);
 		sm->tac_hold = true;
@@ -4376,7 +4379,7 @@ static void ptt_release(radio_sm_t *sm, bool roger, uint32_t now_ms)
 #if CONFIG_DMR
 	// DMR and C4FM: the roger sound goes through the encoder in place of the mic, the stack keeps PTT down until it
 	// is out (dig_roger_poll), then the release below runs as usual
-	if (roger && sm->set.roger_beep && sm->view.state == RS_TX &&
+	if (roger && sm->set.roger_beep && roger_here(sm) && sm->view.state == RS_TX &&
 	    (sm->dmr_running || DIG_C4FM(sm))) {
 		ambeVoiceTxTone(sm->set.roger_sound < ROGER_COUNT ? sm->set.roger_sound : ROGER_CLASSIC);
 		sm->dig_roger = true;
@@ -4423,7 +4426,7 @@ static void ptt_release(radio_sm_t *sm, bool roger, uint32_t now_ms)
 		sm->view.tone_burst = false;
 	}
 	sm->burst_keyed = false;
-	if (roger && !keyed && sm->set.roger_beep && sm->view.state == RS_TX && sm->view.ch.mode == RADIO_MODE_FM &&
+	if (roger && !keyed && sm->set.roger_beep && roger_here(sm) && sm->view.state == RS_TX && sm->view.ch.mode == RADIO_MODE_FM &&
 			roger_start(sm)) {
 		sm->roger_ms = now_ms != 0 ? now_ms : 1;
 		sm->view.roger = true;
@@ -5133,6 +5136,9 @@ static void settings_to_radio(const settings_t *st, radio_settings_t *s)
 	s->tac_rx = (st->tac_flags & SETTINGS_TAC_RX) != 0;
 	s->leds_off = (st->tac_flags & SETTINGS_TAC_LEDS_OFF) != 0;
 	s->tac_style = (uint8_t)((st->tac_flags & SETTINGS_TAC_STYLE_MASK) >> SETTINGS_TAC_STYLE_SHIFT);
+	s->tac_rxend = (st->tac_flags & SETTINGS_TAC_RXEND) != 0;
+	s->tones_off = (uint8_t)((st->tac_modes >> SETTINGS_TACM_TONES_SHIFT) & 0x0Fu);
+	s->roger_off = (uint8_t)((st->tac_modes >> SETTINGS_TACM_ROGER_SHIFT) & 0x0Fu);
 	s->tx_inhibit = (st->rs_flags & SETTINGS_RS_TX_INHIBIT) != 0;
 	s->scan_priority = (st->rs_flags & SETTINGS_RS_SCAN_PRIORITY) != 0;
 	s->scan_beep = (st->rs_flags & SETTINGS_RS_SCAN_BEEP) != 0;
@@ -5164,7 +5170,10 @@ static void radio_to_settings(const radio_settings_t *s, uint32_t now_ms)
 	st->roger_sound = s->roger_sound;
 	st->tac_flags = (uint8_t)((s->tac_key ? SETTINGS_TAC_KEY : 0) | (s->tac_unkey ? SETTINGS_TAC_UNKEY : 0) |
 				  (s->tac_rx ? SETTINGS_TAC_RX : 0) | (s->leds_off ? SETTINGS_TAC_LEDS_OFF : 0) |
-				  ((s->tac_style << SETTINGS_TAC_STYLE_SHIFT) & SETTINGS_TAC_STYLE_MASK));
+				  ((s->tac_style << SETTINGS_TAC_STYLE_SHIFT) & SETTINGS_TAC_STYLE_MASK) |
+				  (s->tac_rxend ? SETTINGS_TAC_RXEND : 0));
+	st->tac_modes = (uint8_t)(((s->tones_off & 0x0Fu) << SETTINGS_TACM_TONES_SHIFT) |
+				  ((s->roger_off & 0x0Fu) << SETTINGS_TACM_ROGER_SHIFT));
 	st->rs_flags = (uint8_t)((s->roger_beep ? SETTINGS_RS_ROGER_BEEP : 0) | (s->tx_inhibit ? SETTINGS_RS_TX_INHIBIT : 0) |
 				 (s->scan_priority ? SETTINGS_RS_SCAN_PRIORITY : 0) |
 				 (s->scan_beep ? SETTINGS_RS_SCAN_BEEP : 0) | (s->key_beep ? SETTINGS_RS_KEY_BEEP : 0) |
@@ -6452,6 +6461,17 @@ static int16_t rssi_held(radio_sm_t *sm, int16_t rssi_dbm)
 }
 #endif
 
+// Settings > Roger & tones: the tactical tones and the roger sound, each on or off per mode of the channel in use
+static bool tones_here(const radio_sm_t *sm)
+{
+	return sm->view.ch.mode < 8u && (sm->set.tones_off & (1u << sm->view.ch.mode)) == 0;
+}
+
+static bool roger_here(const radio_sm_t *sm)
+{
+	return sm->view.ch.mode < 8u && (sm->set.roger_off & (1u << sm->view.ch.mode)) == 0;
+}
+
 // Tactical tones (Settings > Sound): the held key-up once the key tone is over, the unkey tone when a transmission has
 // ended, the reception tone when one starts. Every poll, before anything returns
 static void tac_service(radio_sm_t *sm, uint32_t now_ms)
@@ -6479,10 +6499,13 @@ static void tac_service(radio_sm_t *sm, uint32_t now_ms)
 		}
 	}
 	bool tx = sm->view.state == RS_TX, rx = sm->view.state == RS_RX;
-	if (sm->tac_prev_tx && !tx && sm->set.tac_unkey && !sm->view.ch.no_beep && !sm->host_audio) {
+	bool here = tones_here(sm) && !sm->view.ch.no_beep;
+	if (sm->tac_prev_tx && !tx && sm->set.tac_unkey && here && !sm->host_audio) {
 		beep(sm, BEEP_TAC_UNKEY);
-	} else if (!sm->tac_prev_rx && rx && !sm->tac_prev_tx && sm->set.tac_rx && !sm->view.ch.no_beep) {
+	} else if (!sm->tac_prev_rx && rx && !sm->tac_prev_tx && sm->set.tac_rx && here) {
 		beep(sm, BEEP_TAC_RX);
+	} else if (sm->tac_prev_rx && !rx && !tx && sm->set.tac_rxend && here) {
+		beep(sm, BEEP_TAC_RXEND);	// the reception has ended (not our own key-up cutting it)
 	}
 	sm->tac_prev_tx = tx;
 	sm->tac_prev_rx = rx;

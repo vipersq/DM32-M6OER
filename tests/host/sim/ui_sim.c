@@ -656,11 +656,32 @@ static int32_t sim_late[UI_SET_COUNT - UI_SET_RAM_COUNT];
 
 int32_t ui_svc_setting_get(uint8_t id)
 {
+	if (id >= UI_SET_TONES_FM && id <= UI_SET_ROGER_C4FM)	// stored as the firmware does, a bit for off: on by default
+		return !sim_late[id - UI_SET_RAM_COUNT];
+	if (id == UI_SET_TAC_ALL) {	// on when every part is, as the firmware (ui_svc_storage.c)
+		static const uint8_t parts[] = { UI_SET_TAC_MODE, UI_SET_TAC_LEDS, UI_SET_TAC_KEY, UI_SET_TAC_UNKEY, UI_SET_TAC_RX,
+						 UI_SET_TAC_RXEND };
+		for (unsigned i = 0; i < sizeof parts; i++)
+			if (ui_svc_setting_get(parts[i]) == 0)
+				return 0;
+		return 1;
+	}
 	return id >= UI_SET_RAM_COUNT && id < UI_SET_COUNT ? sim_late[id - UI_SET_RAM_COUNT] : ui_svc_ram_get(id);
 }
 
 bool ui_svc_setting_set(uint8_t id, int32_t value)
 {
+	if (id >= UI_SET_TONES_FM && id <= UI_SET_ROGER_C4FM) {
+		sim_late[id - UI_SET_RAM_COUNT] = value == 0;
+		return true;
+	}
+	if (id == UI_SET_TAC_ALL) {	// each part, as the firmware
+		static const uint8_t parts[] = { UI_SET_TAC_LEDS, UI_SET_TAC_KEY, UI_SET_TAC_UNKEY, UI_SET_TAC_RX, UI_SET_TAC_RXEND,
+						 UI_SET_TAC_MODE };
+		for (unsigned i = 0; i < sizeof parts; i++)
+			ui_svc_setting_set(parts[i], value != 0);
+		return true;
+	}
 	if (id < UI_SET_RAM_COUNT || id >= UI_SET_COUNT)
 		return ui_svc_ram_set(id, value);
 	sim_late[id - UI_SET_RAM_COUNT] = value;

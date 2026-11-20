@@ -1910,6 +1910,7 @@ void ui_apply_setting(uint8_t id, int32_t v)
 		ui_theme_set((uint8_t)v);
 		break;
 	case UI_SET_TAC_MODE:
+	case UI_SET_TAC_ALL:	// the red screen is the UI's part of it
 		ui_st.tac_red = v != 0;
 		gfx_set_red(ui_st.tac_red);
 		break;

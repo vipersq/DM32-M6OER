@@ -2602,12 +2602,24 @@ static void test_roger_sounds(void)
 }
 
 static void set_tac_all(radio_settings_t *s) { s->tac_key = s->tac_unkey = s->tac_rx = true; }
-static void set_tac_none(radio_settings_t *s) { s->tac_key = s->tac_unkey = s->tac_rx = false; }
+static void set_tac_none(radio_settings_t *s)
+{
+	s->tac_key = s->tac_unkey = s->tac_rx = s->tac_rxend = false;
+	s->tones_off = s->roger_off = 0;
+	s->roger_beep = false;
+}
 static void set_leds_off(radio_settings_t *s) { s->leds_off = true; }
 static void set_leds_on(radio_settings_t *s) { s->leds_off = false; }
 static void set_tac_style_deep(radio_settings_t *s) { s->tac_style = 0; }
 static void set_tac_style_bloop(radio_settings_t *s) { s->tac_style = 1; }
 static void set_tac_style_high(radio_settings_t *s) { s->tac_style = 3; }
+static void set_tac_rxend(radio_settings_t *s) { s->tac_key = s->tac_unkey = s->tac_rx = false; s->tac_rxend = true; }
+static void set_tac_all_fm_off(radio_settings_t *s)
+{
+	s->tac_key = s->tac_unkey = s->tac_rx = s->tac_rxend = true;
+	s->roger_beep = true;
+	s->tones_off = s->roger_off = 1u << RADIO_MODE_FM;
+}
 
 static uint32_t beeps_tried(void)
 {
@@ -2682,6 +2694,33 @@ static void test_tactical_tones(void)
 	settings(set_tac_style_deep);
 	run(50);
 	CHECK(beep_pattern(BEEP_TAC_KEY, &seg) >= 1 && seg == deep);
+	// The reception end tone: one when the squelch closes after a reception
+	settings(set_tac_rxend);
+	uint32_t b2 = beeps_tried();
+	signal_on(0, sm.view.ch.rx_hz, 30, no_tone);
+	for (int i = 0; i < 40 && sm.view.state != RS_RX; i++) {
+		run(25);
+	}
+	run(300);
+	CHECK(sm.view.state == RS_RX && beeps_tried() == b2);	// the RX tone is off here, the end tone on
+	hw.sig[0].hz = 0;
+	for (int i = 0; i < 80 && sm.view.state == RS_RX; i++) {
+		run(25);
+	}
+	run(50);
+	CHECK(sm.view.state == RS_IDLE && beeps_tried() == b2 + 1);
+	// Off in FM (Settings > Roger & tones > Tones in FM): neither the key-up tone nor the end tone, keyed at once;
+	// the roger sound off in FM likewise, on in the other modes
+	settings(set_tac_all_fm_off);
+	unsigned tx1 = hw.tx_calls;
+	req(RREQ_PTT, 1);
+	CHECK(sm.view.state == RS_TX && !sm.tac_hold && hw.tx_calls == (int)tx1 + 1);
+	run(300);
+	req(RREQ_PTT, 0);
+	CHECK(sm.view.state == RS_IDLE && !sm.view.roger && hw.tone_hz == 0);
+	run(200);
+	CHECK(beeps_tried() == b2 + 1);
+	settings(set_tac_none);
 }
 
 static void test_roger_burst(void)

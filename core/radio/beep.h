@@ -35,6 +35,7 @@ typedef enum {
 	BEEP_TAC_KEY,		// tactical tones (Settings > Sound): PTT pressed, before keying
 	BEEP_TAC_UNKEY,		// ... the transmission has ended
 	BEEP_TAC_RX,		// ... a reception starts
+	BEEP_TAC_RXEND,		// ... a reception has ended
 	BEEP_COUNT
 } beep_t;
 
@@ -61,6 +62,7 @@ typedef struct {
 #define BEEP_SEGS_MAX	6
 // Tactical tone styles (beep_tac_style): 0 deep, 1 bloop, 2 low chirp, 3 high chirp
 #define BEEP_TAC_STYLES	4
+#define BEEP_TAC_EVENTS	4	// BEEP_TAC_KEY .. BEEP_TAC_RXEND, in that order
 void beep_tac_style(uint8_t style);
 
 // audio NULL: beeps are counted as dropped
