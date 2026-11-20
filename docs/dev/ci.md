@@ -40,7 +40,7 @@ push runs only the manual workflow. A newer push cancels the run in progress (`c
 
 | Job | Command |
 |---|---|
-| `unit tests` | `SANITIZE=1 tools/coverage.sh` (the host tests with the tshark pcap checks, built once with `--coverage` and ASan / UBSan, and gcovr's report), then the UI screen gallery (`uiSim --gallery`) |
+| `unit tests` | `SANITIZE=1 tools/coverage.sh` (the host tests with the tshark pcap checks, built once with `--coverage` and ASan / UBSan, and gcovr's report), then the bench tools (`tools/ci.sh --steps bench`) and the UI screen gallery (`uiSim --gallery`) |
 | `checks` | `tools/ci.sh --steps registry,python,licenses` (doc links and the strict web site build among the Python checks; the job installs `site/requirements.txt` for the site) |
 | `firmware (Arm)` | `tools/ci.sh --quick --steps firmware --toolchain arm`: every board built with the Arm toolchain, default and maximal (with the stack check), in one job |
 | `firmware (C-SKY)` | `tools/ci.sh --quick --steps firmware --toolchain csky`, in the csky-elf image (`tools/docker/csky-toolchain/run.sh`) unless the runner has csky-elf GCC; skipped where the image isn't available |
@@ -234,12 +234,13 @@ tools/docker/csky-toolchain/run.sh tools/ci.sh --quick --steps firmware --board 
 |---|---|
 | `registry` | Every `board.toml` and `platform.toml` is well formed and agrees with `board.mk`, the linker scripts and `board_t`; `tools/rfoundry/rfoundry/registry.json` is current; the loader's self-test (`tools/boards.py`) |
 | `host` | `make -C tests/host`, with each board's own tests (`boards/<b>/tests/host.mk`) |
+| `bench` | Each bench tool with a Makefile under `tools/bench/*/` (built from the `core/` sources, such as the P25 and NXDN tools), with zero warnings |
 | `python` | Every Python file parses, the HIL test collection, rfoundry's tests, every tool's `--self-test` (found by searching `tools/` and `stub/`, so a new tool needs no ci.sh change), doc links, the glossary, the web site build and the flasher's tests |
 | `firmware` | Every board whose compiler is installed: the default build, each build option value (`board.toml` `[[build_options]]`, such as a band), each `[ci] extra` configuration, the feature matrix, and the flash stubs of each built platform (`platform.toml` `stubs`) |
 | `licenses` | `tools/license_grep.sh` and `reuse lint` |
 | `similarity` | `tools/similarity_scan.py`, only with `RFOUNDRY_SIMILARITY_REFS` set |
 
-Every step but `host` needs Python 3.11 or later for the registry's TOML. `tools/rfoundry_python.sh` finds it:
+Every step but `host` and `bench` needs Python 3.11 or later for the registry's TOML. `tools/rfoundry_python.sh` finds it:
 `$RFOUNDRY_PYTHON`, else the newest `python3.N` on `PATH`. A board whose compiler is missing is skipped with the command
 that installs it (its platform's `toolchain.build`). `--quick` builds each board's default and maximal configurations,
 `--matrix` the feature matrix.
@@ -273,7 +274,7 @@ workflow types a version. Platforms that share a toolchain id must pin the same 
 
 | Toolchain | Set-up |
 |---|---|
-| `arm` | `tools/install-arm-toolchain.sh` downloads the pinned, checksummed release into `~/opt`, every time (no cache); a runner that has it already skips the download |
+| `arm` | `tools/install-arm-toolchain.sh` copies the pinned toolchain into `~/opt` out of `[toolchain] image` (public on ghcr.io, pinned by digest, made by `tools/docker/toolchains/build-arm-ci.sh`), or downloads Arm's checksummed release when that fails; every time (no cache). A runner that has it already skips both. The build runs on the runner |
 | `csky` | csky-elf GCC on `PATH` when the runner has it; otherwise the csky-elf image (`[toolchain] image`, public on ghcr.io, or `RFOUNDRY_CSKY_IMAGE`): logged in to only when a workflow passes a registry (`RFOUNDRY_CSKY_REGISTRY`, for a private copy), pulled, then the job runs its build through `tools/docker/csky-toolchain/run.sh` (the action's `run` output) |
 
 No workflow builds csky-elf GCC from source. The image is built by `tools/docker/csky-toolchain/build.sh`

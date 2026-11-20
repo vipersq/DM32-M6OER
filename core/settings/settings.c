@@ -28,7 +28,7 @@ _Static_assert(SETTINGS_PAGES <= SETTINGS_PAGES_MAX, "settings_t outgrew its pag
 _Static_assert(sizeof(settings_t) % 4 == 0, "settings_t has tail padding");
 _Static_assert(offsetof(settings_t, dual_b) == SETTINGS_PAGE_BYTES, "page 1 starts at its first field");
 _Static_assert(offsetof(settings_t, ref_trim_ppb) % 2 == 0, "ref_trim_ppb is aligned");
-_Static_assert(sizeof(settings_t) == 424, "settings_t changed size: update docs/spec/settings-store.md 3 and this");
+_Static_assert(sizeof(settings_t) == 440, "settings_t changed size: update docs/spec/settings-store.md 3 and this");
 
 static settings_t live;			// under the quick lock
 static settings_t saved;		// what the newest record holds (or the defaults)
@@ -59,10 +59,25 @@ void settings_defaults(settings_t *s)
 	s->roam_beacon_s = 60;		// ROAM_BEACON_DEFAULT_S
 	s->roam_beacon_len_s = 4;	// ROAM_BEACON_LEN_DEFAULT
 	s->roam_survey = 1;		// ROAM_SURVEY_SYNC
-	s->gps = 1;			// powered only on radios where a module was heard (board_t.gps_enable)
+	s->gps = 1;			// powered only on radios where a module was heard (board_t.gps)
 	s->vfo2_power = SETTINGS_UNSET8;
 	s->vfo2_cc = 1;
 	s->vfo2_ts = 1;
+	s->power_levels = board.power_count;
+}
+
+// Power levels stored against another level count (an older record, or a board whose levels changed) may name a
+// higher power now than the one chosen: back to the defaults, which the radio shows, instead of a guess
+static void power_levels_check(settings_t *s)
+{
+	if (s->power_levels == board.power_count) {
+		return;
+	}
+	s->vfo_power = SETTINGS_UNSET8;
+	s->vfo2_power = SETTINGS_UNSET8;
+	s->master_power = SETTINGS_UNSET8;
+	s->aprs_power = 0u;	// the radio's current level
+	s->power_levels = board.power_count;
 }
 
 // Page k of a settings_t: its offset and length
@@ -107,6 +122,54 @@ static slot_state_t read_slot(uint16_t sector, uint16_t slot, uint8_t *r)
 	default:
 		return SLOT_BAD;
 	}
+}
+
+// A record from the C4FM fork before it took in P25 and NXDN (up to 424 bytes): its fields sat at bytes 395-423, where
+// RadioFoundry has since put power_levels, the Tier III and signaling tone bytes (408 bytes), and the fork's now
+// follow. Such a page 1 ends past RadioFoundry's 396 bytes, at most at 424, and not at 408 (RadioFoundry's own record):
+// each field goes where it is now (one the record is too short for: its default), RadioFoundry's bytes read as an
+// older record (0), and the per-mode bits of tac_modes (the tones in the low nibble, the roger in the high, C4FM as
+// mode 2) become a byte each by radio_mode_t (C4FM 4)
+static void fork_record_move(settings_t *s, uint16_t n1)
+{
+	uint16_t end = (uint16_t)(SETTINGS_PAGE_BYTES + n1);
+	if (end <= 396u || end > 424u || end == 408u) {
+		return;
+	}
+	uint8_t o[424 - 395];
+	memset(o, 0, sizeof o);
+	memcpy(o, (const uint8_t *)s + 395, (size_t)(end - 395u));
+	settings_t d;
+	settings_defaults(&d);
+	memcpy((uint8_t *)s + 395, (const uint8_t *)&d + 395, sizeof(settings_t) - 395u);
+	s->power_levels = 0;			// an older record's: the stored levels go back to the defaults
+#define OLD(off, n)	((off) + (n) <= end)
+	if (OLD(395, 1))
+		s->c4fm_dgid = o[0];
+	if (OLD(396, 3)) {
+		s->c4fm_tx_level = o[1];
+		s->c4fm_preamble = o[2];
+		s->voice_rx_gain = (int8_t)o[3];
+	}
+	if (OLD(399, 1))
+		s->c4fm_flags = o[4];
+	if (OLD(400, 12)) {
+		memcpy(s->c4fm_call, &o[5], sizeof s->c4fm_call);
+		s->c4fm_call[sizeof s->c4fm_call - 1u] = '\0';
+	}
+	if (OLD(412, 4))
+		memcpy(&s->wx_room, &o[17], 4);
+	if (OLD(416, 1))
+		s->roger_sound = o[21];
+	if (OLD(420, 1)) {
+		s->tac_flags = o[22];
+		s->tac_ui = o[23];
+		s->tac_bright = o[24];
+		uint8_t tm = o[25], tones = tm & 0x0Fu, roger = tm >> 4;
+		s->tac_modes = (uint8_t)((tones & 0x03u) | ((tones & 0x04u) << 2));
+		s->roger_modes = (uint8_t)((roger & 0x03u) | ((roger & 0x04u) << 2));
+	}
+#undef OLD
 }
 
 static bool have_newest;		// stats.sector / stats.slot point at the newest valid record (or a slot past it that failed)
@@ -207,18 +270,23 @@ settings_load_t settings_init(void)
 				uint16_t nk = (uint16_t)(r[10] | (r[11] << 8));
 				memcpy((uint8_t *)&live + k * SETTINGS_PAGE_BYTES, &r[HDR], nk < page_len(k) ? nk : page_len(k));
 				whole = whole && nk == page_len(k) && qk == seq0 - k;
+				if (k == 1) {
+					fork_record_move(&live, nk);
+				}
 				valid_mask |= 1u << sk;	// part of the set in force: saves must not erase it either
 			} else {
 				whole = false;
 			}
 		}
 		stats.load = whole ? SETTINGS_LOADED : SETTINGS_UPGRADED;
+		power_levels_check(&live);
 	}
 	storage_unlock();
 	saved = live;
 	dirty = false;
 	return (settings_load_t)stats.load;
 }
+
 
 // Before settings_init: the defaults
 static void ensure(void)

@@ -7,6 +7,7 @@
 #include <string.h>
 #include "radio/radio.h"
 #include "radio/radio_sm.h"
+#include "radio/radio_trunk.h"
 #include "hal_time.h"
 #include "config.h"
 #if CONFIG_C4FM
@@ -34,6 +35,9 @@
 #if CONFIG_ZONE_WRITE
 #include "codeplug/zone_edit.h"
 #endif
+#if CONFIG_AIR_RAW
+#include "debuglink/debuglink_air.h"
+#endif
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
@@ -42,7 +46,7 @@
 // Task layout (see core/app/app.c for the whole picture)
 #define RADIO_TASK_PRIORITY	4
 #if CONFIG_DMR
-#define RADIO_TASK_STACK	768	// words: the DMR call stack and the AMBE FEC run here
+#define RADIO_TASK_STACK	776	// words: the DMR call stack and the AMBE FEC run here (the deepest maximal build: 2744 B + margin)
 #else
 #define RADIO_TASK_STACK	512	// words
 #endif
@@ -56,6 +60,21 @@ static radio_settings_t shared_settings;	// the published copy, under view_lock
 // settings are the ones in force soon, so radio_get_settings answers with them
 static uint32_t settings_sent, settings_taken, settings_published;
 static radio_view_t shared_view;	// the published copy, under view_lock
+#if CONFIG_P25
+static radio_p25_settings_t pending_p25;	// radio_req_p25_settings -> the radio task, under view_lock
+#endif
+#if CONFIG_NXDN
+static radio_nxdn_settings_t pending_nxdn;	// radio_req_nxdn_settings -> the radio task, under view_lock
+#endif
+#if CONFIG_AIR_RAW
+static volatile bool bench_held, bench_keyed;	// published sm.air_bench, sm.bench_keyed
+static volatile uint8_t bench_ack;		// published sm.bench_seq
+static uint8_t bench_seq;			// the debug link task's
+static const debuglink_air_core_t bench_core;	// below
+#endif
+#if CONFIG_DMR_TRUNK
+static radio_t3_view_t shared_t3;	// ... and the whole trunking view (radio_get_t3_view)
+#endif
 static volatile bool dtmf_ready;	// shared_view.dtmf_ready, read without the lock (radio_dtmf_ready)
 #if CONFIG_DUAL_WATCH
 static channel_t shared_vfo[2];		// the VFOs' settings (radio_get_vfo), under view_lock
@@ -113,6 +132,10 @@ static void hs_post(const radio_req_t *req, bool must)
 static void publish(void)
 {
 	xSemaphoreTake(view_lock, portMAX_DELAY);
+#if CONFIG_DMR_TRUNK
+	radio_sm_t3_brief(&sm);
+	shared_t3 = radio_t3v;
+#endif
 	shared_view = sm.view;
 	dtmf_ready = sm.view.dtmf_ready;
 	radio_sm_shown_view(&sm, &shared_view);	// a roaming survey visit: the screens keep the site it left
@@ -140,6 +163,11 @@ static void publish(void)
 #if CONFIG_HOTSPOT
 	radio_hs_publish(&sm);
 #endif
+#if CONFIG_AIR_RAW
+	bench_held = sm.air_bench;
+	bench_keyed = sm.bench_keyed;
+	bench_ack = sm.bench_seq;
+#endif
 }
 
 
@@ -164,6 +192,24 @@ static void radio_task(void *arg)
 					wake_posted = false;
 #endif
 					woken = true;
+#if CONFIG_P25
+				} else if (req.type == RREQ_P25_SET) {
+					radio_p25_settings_t p;
+					xSemaphoreTake(view_lock, portMAX_DELAY);
+					p = pending_p25;
+					xSemaphoreGive(view_lock);
+					radio_p25_set_settings(&p);
+					radio_sm_request(&sm, &req, hal_millis());
+#endif
+#if CONFIG_NXDN
+				} else if (req.type == RREQ_NXDN_SET) {
+					radio_nxdn_settings_t n;
+					xSemaphoreTake(view_lock, portMAX_DELAY);
+					n = pending_nxdn;
+					xSemaphoreGive(view_lock);
+					radio_nxdn_set_settings(&n);
+					radio_sm_request(&sm, &req, hal_millis());
+#endif
 				} else if (req.type == RREQ_SETTINGS) {
 					radio_settings_t set;
 					xSemaphoreTake(view_lock, portMAX_DELAY);
@@ -237,6 +283,10 @@ void radio_core_start(void)
 #if CONFIG_DMR
 	dmr_call_set_wake(wake);
 #endif
+#if CONFIG_DMR_TRUNK
+	radio_sm_t3_brief(&sm);
+	shared_t3 = radio_t3v;
+#endif
 	shared_view = sm.view;
 	shared_serial = sm.serial;
 	shared_settings = sm.set;
@@ -244,6 +294,9 @@ void radio_core_start(void)
 	radio_hs_init(hs_post);
 #endif
 	xTaskCreate(radio_task, "radio", RADIO_TASK_STACK, NULL, RADIO_TASK_PRIORITY, NULL);
+#if CONFIG_AIR_RAW
+	debuglink_air_set_core(&bench_core);
+#endif
 #if CONFIG_HOTSPOT
 	hotspot_set_radio(&radio_hs_ops);
 #endif
@@ -260,6 +313,19 @@ void radio_get_view(radio_view_t *v)
 	xSemaphoreGive(view_lock);
 }
 
+#if CONFIG_DMR_TRUNK
+void radio_with_t3_view(void (*fn)(const radio_t3_view_t *x, void *ctx), void *ctx)
+{
+	if (view_lock == NULL) {
+		fn(&shared_t3, ctx);	// all zero: the radio task hasn't started
+		return;
+	}
+	xSemaphoreTake(view_lock, portMAX_DELAY);
+	fn(&shared_t3, ctx);
+	xSemaphoreGive(view_lock);
+}
+#endif
+
 radio_state_t radio_get_state(void)
 {
 	if (view_lock == NULL) {
@@ -269,6 +335,23 @@ radio_state_t radio_get_state(void)
 	radio_state_t st = shared_view.state;
 	xSemaphoreGive(view_lock);
 	return st;
+}
+
+bool radio_get_zone_pos(uint16_t *zone, uint16_t *pos, uint16_t *size)
+{
+	if (view_lock == NULL) {
+		*zone = 0;
+		*pos = 0;
+		*size = 0;
+		return false;
+	}
+	xSemaphoreTake(view_lock, portMAX_DELAY);
+	*zone = shared_view.zone_index;
+	*pos = shared_view.zone_pos;
+	*size = shared_view.zone_size;
+	bool ready = shared_view.state != RS_TX && !shared_view.hotspot;	// radio_sm_request's busy
+	xSemaphoreGive(view_lock);
+	return ready;
 }
 
 uint32_t radio_view_serial(void)
@@ -342,7 +425,6 @@ void radio_req_dmr_call_back(void) { post(RREQ_DMR_CALL_BACK, 0, 0); }
 void radio_req_dmr_target_clear(void) { post(RREQ_DMR_TARGET_CLEAR, 0, 0); }
 void radio_req_dmr_timeslot(uint8_t ts) { post(RREQ_DMR_TS, ts, 0); }
 void radio_req_dmr_color_code(uint8_t cc) { post(RREQ_DMR_CC, cc, 0); }
-void radio_req_mode(uint8_t mode) { post(RREQ_MODE, mode, 0); }
 void radio_req_vfo_sfr(uint8_t a) { post(RREQ_VFO_SFR, a, 0); }
 void radio_req_dmr_hear_all(bool on) { post(RREQ_DMR_HEAR_ALL, on, 0); }
 // A lost focus change would send the next PTT to the wrong target: wait a little for room in the queue
@@ -372,6 +454,70 @@ void radio_req_c4fm_wx_search(const char *text)
 	c4fm_call_wx_text(text);
 	post_pair(RREQ_C4FM_WX, C4FM_WX_SEARCH, 0, 0);
 }
+#endif
+
+#if CONFIG_DMR || CONFIG_P25 || CONFIG_NXDN
+void radio_req_mode(uint8_t mode) { post(RREQ_MODE, mode, 0); }
+#endif
+#if CONFIG_P25
+void radio_req_p25_settings(const radio_p25_settings_t *s)
+{
+	if (view_lock == NULL) {
+		return;
+	}
+	xSemaphoreTake(view_lock, portMAX_DELAY);
+	pending_p25 = *s;
+	xSemaphoreGive(view_lock);
+	post(RREQ_P25_SET, 0, pdMS_TO_TICKS(50));
+}
+#endif
+#if CONFIG_NXDN
+void radio_req_nxdn_settings(const radio_nxdn_settings_t *s)
+{
+	if (view_lock == NULL) {
+		return;
+	}
+	xSemaphoreTake(view_lock, portMAX_DELAY);
+	pending_nxdn = *s;
+	xSemaphoreGive(view_lock);
+	post(RREQ_NXDN_SET, 0, pdMS_TO_TICKS(50));
+}
+#endif
+
+#if CONFIG_AIR_RAW
+// The air interface bench's way to the radio (debuglink_air_core_t), from the debug link task. Enter and keying wait
+// for the radio task's answer: it runs above the debug link, so it is normally there when the post returns, but a
+// retune or a keying may sleep (a synthesizer locking). The unkey comes from the modem's task too: it only posts
+static bool bench_wait(uint8_t type, int32_t arg, uint32_t arg2)
+{
+	uint8_t seq = ++bench_seq;
+	post_pair(type, arg | ((int32_t)seq << 8), arg2, pdMS_TO_TICKS(50));
+	for (int i = 0; i < 50 && bench_ack != seq; i++) {
+		vTaskDelay(pdMS_TO_TICKS(2));
+	}
+	return bench_ack == seq;
+}
+
+static bool bench_enter(void)
+{
+	return bench_held || (bench_wait(RREQ_AIR_BENCH, 1, 0) && bench_held);
+}
+
+static void bench_leave(void)
+{
+	post_pair(RREQ_AIR_BENCH, 0, 0, pdMS_TO_TICKS(50));	// must not be lost: the channel comes back with it
+}
+
+static bool bench_tx(bool on, uint16_t max_ms)
+{
+	if (!on) {
+		post_pair(RREQ_AIR_TX, 0, 0, 0);
+		return true;
+	}
+	return bench_wait(RREQ_AIR_TX, 1, max_ms) && bench_keyed;
+}
+
+static const debuglink_air_core_t bench_core = { bench_enter, bench_leave, bench_tx };
 #endif
 
 void radio_req_scan(uint8_t cmd) { post(RREQ_SCAN, cmd, 0); }
@@ -437,6 +583,18 @@ void radio_req_beep(uint8_t b) { post(RREQ_BEEP, b, 0); }
 void radio_req_beep_after(uint8_t b, uint32_t delay_ms) { post_pair(RREQ_BEEP, b, delay_ms, 0); }
 void radio_req_vibrate(uint8_t pattern) { post(RREQ_VIBRATE, pattern, 0); }
 void radio_req_roam(uint8_t cmd) { post(RREQ_ROAM, cmd, 0); }
+void radio_req_t3(uint8_t cmd) { post(RREQ_T3, cmd, 0); }
+void radio_req_t3_poll(uint32_t dst) { post_pair(RREQ_T3_POLL, 0, dst, 0); }
+void radio_req_t3_dial(const char *digits)
+{
+#if CONFIG_DMR_TRUNK_GW
+	uint32_t w[2];
+	radio_t3_dial_args(digits, w);
+	post_pair(RREQ_T3_DIAL, (int32_t)w[0], w[1], 0);
+#else
+	(void)digits;
+#endif
+}
 // A lost release would leave the burst keyed until the time-out
 void radio_req_tone_burst(bool on, uint32_t max_ms) { post_pair(RREQ_TONE_BURST, on, max_ms, pdMS_TO_TICKS(50)); }
 void radio_req_tone_burst_key(bool down) { post(RREQ_TONE_BURST_KEY, down, pdMS_TO_TICKS(50)); }
@@ -461,6 +619,20 @@ void radio_get_settings(radio_settings_t *s)
 	}
 	xSemaphoreTake(view_lock, portMAX_DELAY);
 	*s = settings_published == settings_sent ? shared_settings : pending_settings;
+	xSemaphoreGive(view_lock);
+}
+
+void radio_get_sfr_settings(uint8_t *rx, uint8_t *cwid)
+{
+	*rx = 0;		// the defaults (radio_settings_default), before the task runs
+	*cwid = 0;
+	if (view_lock == NULL) {
+		return;
+	}
+	xSemaphoreTake(view_lock, portMAX_DELAY);
+	const radio_settings_t *p = settings_published == settings_sent ? &shared_settings : &pending_settings;
+	*rx = p->sfr_rx;
+	*cwid = p->sfr_cwid;
 	xSemaphoreGive(view_lock);
 }
 

@@ -35,6 +35,9 @@ Symptom: a voice B reported 12 ms after a header, a header twice 26 ms apart, a 
 ended a call early. Cause: the EMB parsing interrupt (sync class 0, data type 0x0D / 0x0E) and other extra reports
 arrive for the same slot, sometimes with a wrong type. Rule: accept only the first report per slot; drop any report
 within 45 ms of the last one (28 ms when listening to both slots); never map data types 0x0D / 0x0E to voice E / F.
+Exception: an idle burst with BS sync is never a repeat. All idle bursts carry the same bits, and a base station
+carrier idle on both slots sends one every slot; dropping them made the carrier look silent, and a trunked call's hang
+timed out ([modem-hrc6000.md](modem-hrc6000.md)).
 Radios: HR_C6000 confirmed on air; the HR_C7000 hook applies the same 45 ms rule.
 
 **1.3 Voice burst numbering lives in the low 3 bits.**
@@ -79,7 +82,9 @@ the second F (13 of 36 bursts played instead of 18-19; HIL 2026-10-10 on c8c9b23
 driver reads page 2 at F's first report (the EMB one) and page 2 still held the old LC then. Rule: until a reception
 has its LC, look at page 2 again at the next burst A (and at F's repeated report and the post-access interrupt); the
 driver logs every look (`dle` lines, `lt` diagnostics line) so the next HIL run shows exactly when the LC appeared.
-Radios: HR_C6000.
+An unchanged page 2 at that A, after a whole superframe of this reception with a good F, is this call's LC: the same
+talker again (HIL 2026-11-14 on the HR_C5000: held back to the second F, 8 bursts played instead of 12; traced `Av`).
+Radios: HR_C6000, HR_C5000.
 
 **1.4b Page 2 isn't per slot.**
 Symptom: with a call on each slot, the wanted call went quiet with the other call's source shown (23 of 78 bursts
@@ -125,6 +130,18 @@ doesn't report voice (1.11), and take a call back only on proof it's the same ca
 ([modem-hrc6000.md](modem-hrc6000.md) 5.6). The LC wait is shorter now. The restart still costs what it did: holding
 it off helps only if the chip keeps its sync through a gap, which isn't known. Radios: HR_C5000 measured; the LC rule
 applies to any chip with a post-access interrupt.
+
+**1.13 After a wake-up, the receiver can stay deaf to the repeater that answered it.**
+Symptom: through a duplex repeater, "Modem refused" on 3 to 9 of every 16-24 key-ups, each one after a wake-up; the
+repeater answered at once and stayed on the air. Cause: the wake-up's CSBK ends with a receiver restart (own timing),
+and the aligned voice start follows a slot later. On some key-ups the chip then raised no receive interrupt and read
+the same 0x52 (0x73) at every tick for the whole 1.5 s wait, so no slot timing was found. The RF path was ruled out
+(the synthesizer was back on receive, no PA). What leaves the chip in that state isn't known. Any restart cleared it,
+and the repeater's timing came on the next slot. Rule: an aligned start that hears nothing for 8 ticks restarts the
+receiver (reason `a`), every 8 ticks until it aligns or times out. Each restart costs up to about 0.5 s of the
+key-up's first voice. On the SDR bench, with the wake-up rules of [dmr-modem.md](dmr-modem.md) 2.7, this took the
+key-ups that failed from 3-9 of 16-24 to 0 of 60. Radios: HR_C5000
+measured; the rule is in the shared engine, so the HR_C6000 has it too.
 
 ## 2. DMR modem timing: HR_C7000
 
@@ -230,9 +247,9 @@ time.
 **3.5 The AT1846S +3 kHz TX offset is a sequencing hack.** The driver adds 3 kHz to the TX frequency to compensate an
 offset caused by turning the receiver on between the frequency write and TX. A switch that writes the frequency with
 the receiver off and goes straight to TX must not add it (bursts were +2.93 kHz off). Rule: measure TX frequency per
-switching sequence; don't carry a fixed offset. RFoundry's direct sequence (RX straight to TX, no idle, which a
-single frequency repeater needs) corrects the same shift with the HR_C6000 MOD1 offset, because the AT1846S applies a
-frequency write only coming out of idle.
+switching sequence; don't carry a fixed offset. RFoundry's direct sequence (RX straight to TX, no idle; SFR roles only)
+corrects the same shift with the HR_C6000 MOD1 offset, roughly (178-554 Hz off on other units), because the AT1846S
+applies a frequency write only coming out of idle.
 
 **3.6 Listen before talk for machine traffic.** Data, ACKs and CSBK answers collided with the far end. Rule: direct
 mode: no voice, data burst or carrier for 120 ms; repeater: 180 ms without data bursts and wait for the hang time to
@@ -291,6 +308,28 @@ at that interrupt, closed the next slot, and finished only at the interrupt afte
 lost the answer that had already started. Rule: finish at that interrupt, hold the receiver on our timing for one slot
 in direct mode, and restart only after that slot's report is no longer due ([modem-hrc6000.md](modem-hrc6000.md) 6.6).
 Radios: the boards on the HR_C6000 glue. Test: `test_tx_end_hold` (hrc6000DmrTest).
+
+**3.16 An HR_C7000 PA control DAC needs its pin.** Symptom: FM TX on a board with no modem attached put the RF chip in
+its TX state on the right frequency, with the TX supply and PA select pins high and DAC B ramped, and nothing reached
+the air. DAC B (and C) reach their pins only after IO_DIPLEX2 bits 28 / 29 are cleared and the DAC's power mode is
+set, which `hrc_modem_analog_init()` does from the modem's start-up; a board that never attached the modem never ran
+it. Rule: a board that drives its PA control from DAC B calls `hrc_modem_analog_init()` in its radio init, with or
+without the modem. Radios: HR_C7000 boards without DMR.
+
+**3.17 An FD6818 register change acts at the next state entry.** Symptom: a new band word (0x1A) written while the chip
+received left the receiver as deaf as before; the same word written before the chip went through idle and back to
+receive worked. Rule: change the chip's settings with the state at idle and enter the state after, as
+`fd6818sh` does (`FD6818SH_STATE_IDLE`, then the new state). The band word is the chip's band, not the radio's: a
+word from another of the chip's bands leaves the receiver deaf with every other register right. Radios: boards with
+the FD6818 as the transceiver.
+
+**3.18 Test DMR receive with strong simplex bursts, not only near sensitivity.** Symptom: about a bit a frame
+corrected on every DMR call from -85 to -40 dBm, and none near sensitivity. Cause: the AT1846S AGC with reg 0x32
+bits 2:0 at 2 or more (undocumented bits) overloads the start of every simplex burst, as the carrier comes and goes
+every 30 ms; a repeater's continuous carrier showed nothing. Sweeps near sensitivity, where receive settings are
+usually tuned, never saw it. Rule: the AT1846S DMR mode table writes 0x32 bits 2:0 clear (`drivers/rf/at1846s`);
+judge a receiver setting at strong simplex levels as well (`dmr-voice.md` 7.1). Radios: AT1846S boards. Test:
+`test_dmr_audio_rx_strong` (tests/hil).
 
 ## 4. AMBE codec calling
 
@@ -709,10 +748,12 @@ the talker's direct copy was clean. It plays, but it is the reason a user would 
 - Going through idle (reg 0x30) at every switch (14.9) makes the synthesizer settle again each slot. The repeat then
   lost 5-10 of 72 inbound frames, with about 190 bit errors. With RX and TX on one frequency, switching 0x30 straight
   between RX and DMR TX keeps it locked: no frames lost, 48-68 bits. The band's RX supply still follows the PA.
-- Straight from RX the carrier is about 3.07 kHz low, and a frequency write can't correct it (3.5). Raise the HR_C6000
-  MOD1 offset (4:0x04, about 75 Hz a step at 461 MHz) for the burst and restore it for RX. On the board measured that is 42
-  steps over the calibrated value (41: -57..-15 Hz, 42: +16..+60 Hz), at one frequency near 461 MHz only. Check it at
-  other frequencies and on each radio.
+- Straight from RX the carrier is about 3.07 kHz low, and a frequency write can't correct it (3.5). The SFR raises the
+  HR_C6000 MOD1 offset (4:0x04, about 75 Hz a step at 461 MHz) for the burst and restores it for RX: 42 steps over the
+  calibrated value on the board measured near 461 MHz (41: -57..-15 Hz, 42: +16..+60 Hz). On two other units of the
+  same radio at 433.45 MHz it missed by 178 and 449-554 Hz, so only the SFR keys this way; everything else goes
+  through idle (each board's hardware page has its keying sequences). Measure the correction per radio and frequency
+  before using it more widely.
 - Key 1 ms after the RF TX interrupt, which comes about 1.28 ms before the slot. 0.6-1.2 ms all did the same; keying
   at the interrupt lost frames. Dropping the PA earlier (28.5-30 ms) changed nothing.
 - VHF and split frequencies keep the idle sequence (not measured).
@@ -791,6 +832,45 @@ on two scans running with no handler entry between them, keep the controller and
 the bank from the scan and unmask the source (the steps of the stall window may be lost). Count every source the fallback handler masks. Radios: the HR_C7000
 boards with an interrupt-driven encoder; one confirmed.
 
+**16.5 Both directions at once on the shared PTT line.**
+Symptom: on a radio whose PTT shares the host's RX line (16.2), PPP died soon after LCP opened and never came back:
+the radio sent and received nothing, the line read low with the cable unplugged, and only a power cycle cleared it.
+The radio kept running (keys, LEDs, its tasks). Cause: electrical, most likely a latch-up at the pad. When the radio
+starts sending while the host is still sending, the line is clamped low: driving the PTT pin high from the SoC
+didn't lift it, and a full SoC reset by the watchdog didn't release it. PPP isn't needed: debug link requests sent
+back to back, without waiting for the answers, did it within 15 ms. Request and answer in turn (the debug link, CPS)
+never did. Rule: on such a radio a host port write waits until the line has been quiet for a few milliseconds
+(`HRC_HOST_TX_IDLE_MS`, `platform/hrc7000/uart_idle.h`), and PPP, whose host sends at any time, stays off. The wait
+can't stop a host that starts sending during the radio's answer; MMDVM and KISS hosts do that too, unchecked. A latched
+line reads as a held PTT, and a chip reset would start a new press, so a press on the shared line needs the pin to have
+read high since start-up and since the last good byte, and not to have gone low within 20 ms of the radio's own serial
+send (`drivers/input/sharedptt`). The start-up key guard can't catch it: the first scan reports nothing during the
+20 ms hold. A line that stays low that way for 2 s flashes the LEDs red and green fast until a power cycle. Don't
+reproduce it more than needed: a latch-up draws current. Radios: one confirmed.
+
+**16.6 A programming cable whose adapter stopped sending.**
+Symptom: through one K-type PL2303 cable on macOS a radio never took the boot ROM load and answered no debug link
+request, while everything the radio sent arrived. Cause: the adapter's sending side had stopped. A fresh open took
+about 1 KB into the system's queue and sent none of it, with the cable pulled out of the radio too; break, DTR, RTS,
+flow control, a baud change, a flush and reopening changed nothing. Unplugging the cable's USB end and plugging it
+back in made it send again. What stops it: closing the port while data is still going out (one close with the queue
+full did it; 20 s of sending at full rate and baud changes with data queued did not). Both tools did that: the boot
+ROM wait keeps answers going out, and the user leaves it or the tool exits. Two traps on the way to seeing it: the web
+flasher's port has a 64 KB buffer, so every write it makes is taken at once and none ever stalls; and Chromium's
+writer `close()` drains on the browser's main thread, which on such an adapter froze the whole browser. Rules: close a
+port only after what was written has had its time on the line (`SerialStream.close()`, `stubtool` `settle()`);
+check a USB-serial cable as it opens with a write larger than all the queues (`sendsData()` in `link.js`: 8 KB of
+0xFF through a 256-byte buffer); never drain to find out. The wait is not enough in the browser: through Chromium the
+same adapter still stopped after two to four open and close cycles with nothing left to send (pyserial: eight cycles,
+no fault), so the check as it opens is what the page relies on, and its message says to replug the cable and to
+replace a cable that keeps doing it. A cable can also pass the check and stop afterwards (the check's own close can
+do it). In that state the adapter also kept an earlier baud rate and ignored the page's 115200: the boot ROM's
+greeting `02 24 00 03` came in as `70 80 70 00 7c` and its sign-off `00 c0 00 03` as `00 00 00 7c` (115200 read at
+about 307200), so neither was recognized and the page listened for its full 3 minutes. Rule: the boot ROM wait also
+knows the two frames by their shape, two bursts of a few bytes 25 to 300 ms apart and then a quiet line with no
+greeting in them (`rom-garbled` in `stub.js`), and the page shows the cable fault at once. With that cable in, the radio also flashed its stuck-line
+pattern (16.5) and stopped when it was pulled out; whether a cable that sends does that too is not measured.
+
 ## 17. Scan
 
 **17.1 Scanning DMR direct mode: the carrier is on air every other slot.**
@@ -816,3 +896,11 @@ stayed at its idle 65-103 during a call at -41 dBm, where the signal strength ro
 only on the noise reading, so it never saw a carrier within the dwell. Rule: on a DMR channel the scan also counts the
 signal strength, past the settle, against its own squelch scale (`RADIO_DMR_SQL_L1_DBM`, 3 dB a level: -100 dBm at the
 default level), so a stop probes whichever reading shows the signal (`test_scan_dmr_noise_deaf`).
+
+**17.4 A strength reading above the DMR scale with no signal.**
+Symptom: on one radio (2026-11-14) the zone scan never reached the DMR test channel during a 7 s call. Its strength
+reading isn't calibrated and read -89 to -93 dBm on every empty channel, above the 17.3 scale (-100 dBm at the default
+level), so every stop counted a carrier and probed for 700 ms instead of the 150 ms dwell: a sweep of its 14 channels
+took about 12 s. Rule: the scale also sits above the floor the scan reads, the lowest strength past the settle on the
+last 8 stops, by 6 dB plus 3 dB a level (`scan_floor`, `RADIO_DMR_SQL_L1_FLOOR_DB`). A call 20 dB over that floor
+still holds the scan, by the noise reading or by the strength alone (`test_scan_dmr_high_floor`).

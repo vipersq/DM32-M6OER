@@ -28,7 +28,7 @@ static const hal_flash_map_t map = {
 	.calibration_addr = 0x10000u, .calibration_size = 0x200u,
 };
 
-const board_t board = { .name = "test", .flash = &sim_flash };
+const board_t board = { .name = "test", .flash = &sim_flash, .power_count = 5 };
 
 static void boot(void)
 {
@@ -530,10 +530,11 @@ static void test_native_and_jobs(void)
 	sim_flash_power_on();
 	CHECK(memcmp(&sim_flash_data[na], magic, 4) == 0 && sim_flash_data[na + 0x6000u] == 0xFF);
 	CHECK(storage_native_erase() == STORAGE_NATIVE_ERASED && sim_flash_data[na + 0x1000u] == 0xFF);
-	// No native area in the map: refused
+	// No native area in the map (a small chip's): nothing to empty, so a factory reset doesn't stop on it
 	sim_flash_create(FLASH_SIZE, &map);
 	boot();
-	CHECK(storage_native_erase() == STORAGE_NATIVE_FAILED);
+	e0 = sim_flash_units();
+	CHECK(storage_native_erase() == STORAGE_NATIVE_BLANK && sim_flash_units() == e0);
 
 	// Jobs: one at a time, run by the poll, then the next may come
 	int one = 1;
@@ -604,6 +605,97 @@ static void test_settings_gateway_upgrade(void)
 	CHECK(st.load == SETTINGS_LOADED && s.ds_ip_gateway == 9996543u && s.vfo2_rx_hz == 446006250u);
 }
 
+// Stored power levels count against the board's level count (power_levels): a record from before it (0), or from a
+// build whose board had another count, loads with the levels back to the defaults, since the same index may name a
+// higher power now; a record of this count keeps them
+static void power_record(uint32_t seq, uint8_t levels)
+{
+	settings_t old;
+	settings_defaults(&old);
+	old.squelch = 3;
+	old.vfo_power = 4;
+	old.master_power = 4;
+	old.aprs_power = 5;
+	old.vfo2_power = 3;
+	old.power_levels = levels;
+	sim_flash_create(FLASH_SIZE, &map);
+	put_record(&map, 0, 0, seq, SETTINGS_LAYOUT | (1u << SETTINGS_PAGE_SHIFT),
+		   (uint16_t)(sizeof(settings_t) - SETTINGS_PAGE_BYTES), (const uint8_t *)&old + SETTINGS_PAGE_BYTES, true,
+		   true);
+	put_record(&map, 0, 1, seq + 1u, SETTINGS_LAYOUT, SETTINGS_PAGE_BYTES, &old, true, true);
+	boot();
+}
+
+static void test_settings_power_levels(void)
+{
+	settings_t s;
+	settings_stats_t st;
+
+	CHECK(board.power_count == 5);
+	settings_defaults(&s);
+	CHECK(s.power_levels == 5);
+	static const uint8_t other[] = { 0, 2, 9 };	// an older record, then other counts
+	for (unsigned i = 0; i < sizeof(other); i++) {
+		power_record(1, other[i]);
+		settings_read(&s);
+		settings_get_stats(&st);
+		CHECK(st.load == SETTINGS_LOADED && s.squelch == 3);
+		CHECK(s.vfo_power == SETTINGS_UNSET8 && s.vfo2_power == SETTINGS_UNSET8 &&
+		      s.master_power == SETTINGS_UNSET8 && s.aprs_power == 0 && s.power_levels == 5);
+	}
+	power_record(1, 5);
+	settings_read(&s);
+	CHECK(s.vfo_power == 4 && s.vfo2_power == 3 && s.master_power == 4 && s.aprs_power == 5 && s.power_levels == 5);
+	// A level chosen after the reset is saved with the count, and kept
+	power_record(1, 0);
+	settings_begin()->master_power = 1;
+	settings_end(1);
+	CHECK(settings_flush());
+	boot();
+	settings_read(&s);
+	CHECK(s.master_power == 1 && s.vfo_power == SETTINGS_UNSET8 && s.power_levels == 5);
+}
+
+// A record from the C4FM fork before it took in P25 and NXDN (424 bytes: its fields from byte 396): they load where
+// they are now (wx_room on), the per-mode bits (tones low nibble, roger high, C4FM as mode 2) a byte each by
+// radio_mode_t, and RadioFoundry's fields between read as an older record
+static void test_settings_fork_record(void)
+{
+	settings_t s, def;
+	uint8_t old[424];
+	settings_defaults(&def);
+	memcpy(old, &def, 395);
+	memset(old + 395, 0, sizeof old - 395);
+	old[395] = 7;						// c4fm_dgid
+	old[396] = 110;						// c4fm_tx_level
+	memcpy(old + 400, "M6OER", 5);				// c4fm_call
+	uint32_t room = 28617u;
+	memcpy(old + 412, &room, 4);				// wx_room
+	old[416] = 3;						// roger_sound
+	old[417] = 0x07u;					// tac_flags
+	old[420] = (uint8_t)(0x04u | (0x04u << 4) | 0x01u);	// tones off in FM and C4FM, the roger off in C4FM
+	sim_flash_create(FLASH_SIZE, &map);
+	put_record(&map, 0, 0, 1, SETTINGS_LAYOUT | (1u << SETTINGS_PAGE_SHIFT), (uint16_t)(sizeof old - SETTINGS_PAGE_BYTES),
+		   old + SETTINGS_PAGE_BYTES, true, true);
+	put_record(&map, 0, 1, 2, SETTINGS_LAYOUT, SETTINGS_PAGE_BYTES, old, true, true);
+	boot();
+	settings_read(&s);
+	CHECK(s.wx_room == 28617u && s.c4fm_dgid == 7 && s.c4fm_tx_level == 110 && strcmp(s.c4fm_call, "M6OER") == 0);
+	CHECK(s.roger_sound == 3 && s.tac_flags == 0x07u);
+	CHECK(s.tac_modes == ((1u << 0) | (1u << 4)) && s.roger_modes == (1u << 4));
+	CHECK(s.t3_stun == 0 && s.t3_kill == 0 && s.sig_dmr[0] == 0 && s.sig_fm[2] == 0 && s.power_levels == board.power_count);
+	// RadioFoundry's own 408-byte record is not the fork's
+	settings_defaults(&def);
+	def.t3_stun = 0x91u;
+	sim_flash_create(FLASH_SIZE, &map);
+	put_record(&map, 0, 0, 1, SETTINGS_LAYOUT | (1u << SETTINGS_PAGE_SHIFT), 408u - SETTINGS_PAGE_BYTES,
+		   (const uint8_t *)&def + SETTINGS_PAGE_BYTES, true, true);
+	put_record(&map, 0, 1, 2, SETTINGS_LAYOUT, SETTINGS_PAGE_BYTES, &def, true, true);
+	boot();
+	settings_read(&s);
+	CHECK(s.t3_stun == 0x91u && s.c4fm_dgid == 0 && s.wx_room == 0);
+}
+
 // hal_flash_map_end: where a map's highest area ends, so a driver can refuse a map its chip is too small for
 static void test_map_end(void)
 {
@@ -626,6 +718,25 @@ static void test_map_end(void)
 	low.calibration_size = 0;			// an area of size 0 is none, wherever its address points
 	low.staging_addr = 0x80000u;
 	CHECK(hal_flash_map_end(&low, 4096) == 0x1B000u);
+}
+
+// hal_flash_map_for: a board with two chip sizes (a 16 MB map and a 1 MB one) gets the map its chip holds, and a chip
+// smaller than both gets none. Before the small map, a 1 MB part stored nothing and lost its settings at every restart
+static void test_map_for(void)
+{
+	const hal_flash_map_t big = { .settings_addr = 0x11000u, .settings_size = 0x8000u, .journal_addr = 0x19000u,
+				      .openfw_eeprom = 0, .openfw_flash = 0x20000u, .openfw_end = 0xE00000u,
+				      .native_addr = 0xE00000u, .native_size = 0x100000u,
+				      .staging_addr = 0xF00000u, .staging_size = 0x40000u };
+	const hal_flash_map_t small = { .settings_addr = 0x11000u, .settings_size = 0x8000u, .journal_addr = 0x19000u,
+					.openfw_eeprom = 0, .openfw_flash = 0x20000u, .openfw_end = 0x100000u };
+	CHECK(hal_flash_map_for(&big, &small, 0x1000000u, 4096) == &big);
+	CHECK(hal_flash_map_for(&big, &small, 0x800000u, 4096) == &small);
+	CHECK(hal_flash_map_for(&big, &small, 0x100000u, 4096) == &small);
+	CHECK(hal_flash_map_for(&big, &small, 0x80000u, 4096) == NULL);
+	CHECK(hal_flash_map_for(&big, NULL, 0x100000u, 4096) == NULL);		// a board with one map: as before
+	CHECK(hal_flash_map_for(&big, NULL, 0x1000000u, 4096) == &big);
+	CHECK(hal_flash_map_for(NULL, NULL, 0x1000000u, 4096) == NULL);
 }
 
 // The crash report's mode and target live in spare bits of accent, theme and updown_home (settings.h): each field
@@ -657,6 +768,25 @@ static void test_crash_bits(void)
 	CHECK(!(s.updown_home & 0x80));		// bit 7 stays free
 	s.theme = 3;				// out of range in bits 0-1: the default
 	CHECK(settings_theme(&s) == 0);
+}
+
+// The Settings > Sound tones share sound_flags with the knob lock: each keeps its bits, and firmware from before the
+// tones (which only sets and clears SETTINGS_KNOB_LOCK) leaves them as they are
+static void test_sound_flags(void)
+{
+	settings_t s;
+	memset(&s, 0, sizeof s);
+	CHECK(settings_tones_off(&s) == 0);		// an older record: every tone on
+	s.sound_flags = SETTINGS_KNOB_LOCK;
+	settings_set_tones_off(&s, 0x0A);
+	CHECK(settings_tones_off(&s) == 0x0A && (s.sound_flags & SETTINGS_KNOB_LOCK));
+	settings_set_tones_off(&s, 0xFF);		// only four bits are kept
+	CHECK(settings_tones_off(&s) == 0x0F && (s.sound_flags & 0x0Eu) == 0);
+	s.sound_flags &= (uint8_t)~SETTINGS_KNOB_LOCK;	// an older firmware's knob change
+	CHECK(settings_tones_off(&s) == 0x0F);
+	s.sound_flags |= SETTINGS_KNOB_LOCK;
+	settings_set_tones_off(&s, 0);
+	CHECK(settings_tones_off(&s) == 0 && s.sound_flags == SETTINGS_KNOB_LOCK);
 }
 
 // The last dual watch B in beeps bits 1-7 and mic_gain bits 4-7: every code reads back, beeps and the mic gain stay
@@ -1121,9 +1251,13 @@ int main(void)
 	test_native_and_jobs();
 	test_settings_layout();
 	test_crash_bits();
+	test_sound_flags();
 	test_map_end();
+	test_map_for();
 	test_settings_pages();
 	test_settings_gateway_upgrade();
+	test_settings_power_levels();
+	test_settings_fork_record();
 	test_settings_bad_records();
 	test_settings_worn_sector();
 	test_write_across_sectors();

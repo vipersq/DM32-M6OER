@@ -9,7 +9,7 @@ import { EE, FL } from "./image.js";
 import {
 	getFreq, putFreq, getBcdId, putBcdId, getTone, putTone, getName, putName, getCoord, coordBytes, u16, put16,
 } from "./fields.js";
-import { decodeArea, getKey, putKeys, keyValid, KEYS } from "./kv.js";
+import { decodeArea, getKey, getRecord, sameRecord, recordValid, putKeys, keyValid, KEYS, RECORD_KEYS } from "./kv.js";
 
 export const LIMITS = {
 	channels: 1024, zones: 68, zoneChannels: 80, contacts: 1024, rxLists: 76, rxListContacts: 32,
@@ -314,8 +314,8 @@ export function encodeAprs(a, r) {
 
 // --- General settings, boot text (7.3.2, 7.2), the settings area's keys (codeplug-settings.md) ---
 
-// The settings area's keys (kv.js KEYS; arsServer, ipGateway: DMR IDs, 0 = off) are fields too: null when the key is
-// absent (the radio keeps its own setting)
+// The settings area's keys (kv.js KEYS; arsServer, ipGateway: DMR IDs, 0 = off; the Settings > Sound tones: true on,
+// false off) are fields too: null when the key is absent (the radio keeps its own setting)
 export function decodeGeneral(b) {
 	const g = b.subarray(GENERAL, GENERAL + GENERAL_SIZE);
 	const kv = decodeArea(b).entries;
@@ -327,6 +327,7 @@ export function decodeGeneral(b) {
 		bootLine1: getName(b, BOOT_TEXT, 16),
 		bootLine2: getName(b, BOOT_TEXT + 16, 16),
 		...Object.fromEntries(KEYS.map((row) => [row.name, getKey(kv, row)])),
+		...Object.fromEntries(RECORD_KEYS.map((row) => [row.name, getRecord(kv, row)])),
 	};
 }
 
@@ -348,6 +349,10 @@ export function encodeGeneral(s, b) {
 	for (const row of KEYS) {
 		const v = s[row.name] ?? null;
 		if (was[row.name] !== v && (v === null || keyValid(row, v))) vals[row.name] = v;
+	}
+	for (const row of RECORD_KEYS) {
+		const v = s[row.name] ?? null;
+		if (!sameRecord(was[row.name], v) && (v === null || recordValid(row, v))) vals[row.name] = v;
 	}
 	if (Object.keys(vals).length) putKeys(b, vals);
 }

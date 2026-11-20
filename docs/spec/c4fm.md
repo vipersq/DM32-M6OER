@@ -179,7 +179,7 @@ receiver: the connect reply (the room) and a room list of five blocks.
 
 | Item | |
 |---|---|
-| Mode | `RADIO_MODE_C4FM`, offered with `board.c4fm`. The VFO's Mode tile cycles FM -> C4FM -> DMR |
+| Mode | `RADIO_MODE_C4FM`, offered with `board.c4fm`. The VFO's Mode tile cycles FM -> C4FM -> DMR -> P25 -> NXDN (P25 and NXDN where the board runs them). `RADIO_MODE_C4FM` is 4, after RadioFoundry's P25 (2) and NXDN (3); the codeplug's mode byte stays 2 |
 | Board | `set_mode(C4FM)`: the RF side as for DMR, then the C4FM modem. PTT keys the board as for DMR (`key_tx` at 12.5 kHz); the engine starts the stream; the core unkeys once the engine is off the air |
 | State | RX / TX follow the engine's phase; the time-out stops the transmission with its terminator |
 | Settings | `settings_t`: `wx_room` (the Wires-X room ID entered), `c4fm_dgid`, `c4fm_tx_level` (%, 0 = 100), `c4fm_preamble` (100 ms units, 0 = 1), `voice_rx_gain` (dB), `c4fm_flags` (bit 0 plain fields, bits 1-2 the decoder), `c4fm_call` ("" = the radio name's first word). An older record reads 0: the defaults |
@@ -330,3 +330,13 @@ at a time (`platform/hrc7000/fm_rx_audio.c`, an owner per start): APRS on the AP
 on C4FM channels. C4FM's start takes the copy from APRS (a channel change before APRS's next poll lets go); APRS's read
 and stop do nothing while C4FM has it, its start fails. Host test: `fmRxShareTest`. RAM with APRS: 86 %.
 
+
+## P25 and NXDN beside C4FM
+
+The fork follows RadioFoundry's P25 and NXDN conventional modes (docs/spec/p25.md, nxdn.md): channels of those kinds,
+the VFO's Mode tile, the channel editor's Mode row (FM, DMR, C4FM, P25, NXDN). The C4FM variant leaves the trunked
+systems out (`CONFIG_DMR_TRUNK`, `CONFIG_P25_TRUNK`) and keeps the roger sounds in place of RadioFoundry's signaling
+tone chains (`CONFIG_SIG_TONES=n`: one or the other drives the encoder's tone input; `ambeVoiceRogerTone` here).
+Settings > Roger & tones has Tones in P25 and Tones in NXDN; `settings_t.tac_modes` and `roger_modes` are a bit per
+`radio_mode_t` each. A settings record from the fork before this (its fields at bytes 395-423) loads with every field
+where it is now (settings.c `fork_record_move`); the stored power levels go back to the defaults once.

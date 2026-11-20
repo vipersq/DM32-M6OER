@@ -49,7 +49,7 @@ int32_t ui_modes_setting_get(uint8_t id)
 	case UI_SET_TAC_LEDS:
 	case UI_SET_TAC_STYLE:
 	case UI_SET_TAC_RXEND:
-	case UI_SET_TONES_FM: case UI_SET_TONES_DMR: case UI_SET_TONES_C4FM:
+	case UI_SET_TONES_FM: case UI_SET_TONES_DMR: case UI_SET_TONES_C4FM: case UI_SET_TONES_P25: case UI_SET_TONES_NXDN:
 	case UI_SET_ROGER_FM: case UI_SET_ROGER_DMR: case UI_SET_ROGER_C4FM:
 		return ui_svc_fm_get(id);
 	case UI_SET_CH_WIDE:
@@ -77,7 +77,7 @@ bool ui_modes_setting_set(uint8_t id, int32_t value)
 	case UI_SET_TAC_LEDS:
 	case UI_SET_TAC_STYLE:
 	case UI_SET_TAC_RXEND:
-	case UI_SET_TONES_FM: case UI_SET_TONES_DMR: case UI_SET_TONES_C4FM:
+	case UI_SET_TONES_FM: case UI_SET_TONES_DMR: case UI_SET_TONES_C4FM: case UI_SET_TONES_P25: case UI_SET_TONES_NXDN:
 	case UI_SET_ROGER_FM: case UI_SET_ROGER_DMR: case UI_SET_ROGER_C4FM:
 		ui_svc_fm_set(id, value);
 		return true;
@@ -106,7 +106,7 @@ void ui_modes_tone_text(int32_t index, sbuf_t *b)
 {
 	subtone_t t = tones_picker((uint16_t)(index < 0 ? 0 : index));
 	if (t.type == TONE_NONE) {
-		sb_str(b, TR("Off"));
+		sb_str(b, TR(VALUE_OFF, "Off"));
 	} else if (t.type == TONE_CTCSS) {
 		sb_u32(b, t.value / 10u, 1);
 		sb_str(b, ".");

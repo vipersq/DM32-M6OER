@@ -50,6 +50,9 @@ endif
 -include boards/$(BOARD)/config.mk
 # The platform's defaults, after the board's: ?= keeps the first value, so the board's wins
 -include platform/$(PLATFORM)/config.mk
+# What the board or platform lists as unsupported or not written is off by default: the list is enough, no
+# CONFIG_X ?= n beside it (docs/build-config.md). A command-line CONFIG_X=y still builds it
+$(foreach f,$(sort $(BOARD_UNSUPPORTED) $(BOARD_NOT_WRITTEN)),$(eval CONFIG_$(f) ?= n))
 include config/features.mk
 include platform/$(PLATFORM)/platform.mk
 
@@ -68,6 +71,13 @@ MCU_DEFS += $(OPTION_DEFS)
 # Hardware options (hal/hal_hwopt.h): a board that has some says BOARD_HWOPTS := y in its board.mk. The others build
 # none of the code that lists, asks for and stores them
 MCU_DEFS += -DRFOUNDRY_HWOPTS=$(if $(filter y,$(BOARD_HWOPTS)),1,0)
+# The sixth character of the APRS tocall (APRDF?, docs/spec/aprs.md 4.2): board.toml aprs_tocall, one per radio
+# (tools/boards.py check validates the file; this only reads the value, and refuses a build without a valid one)
+APRS_TOCALL_ID := $(shell sed -n "s/^aprs_tocall[ 	]*=[ 	]*[\"']\([^\"']*\)[\"'].*/\1/p" boards/$(BOARD)/board.toml 2>/dev/null)
+ifeq ($(filter $(APRS_TOCALL_ID),1 2 3 4 5 6 7 8 9 A B C D E F G H I J K L M N O P Q R S T U V W X Y Z),)
+$(error boards/$(BOARD)/board.toml: aprs_tocall "$(APRS_TOCALL_ID)" is not one character 1-9 or A-Z (docs/dev/board-registry.md))
+endif
+MCU_DEFS += -DAPRS_TOCALL_ID='"$(APRS_TOCALL_ID)"'
 
 BUILD := build/$(BOARD)$(if $(VARIANT),-$(VARIANT))$(OPTION_SUFFIX)
 TARGET := $(BUILD)/rfoundry_$(BOARD)$(OPTION_SUFFIX)
@@ -76,8 +86,12 @@ CORE_DIRS := core/app core/radio core/ui core/input core/codeplug core/settings 
 ifeq ($(CONFIG_DMR),y)
 CORE_DIRS += core/dmr/call core/dmr/ambe core/dmr/fec
 endif
+# DMR Tier III trunking (the mobile station side): PDUs, system rules, channel plans, the engine
+ifeq ($(CONFIG_DMR_TRUNK),y)
+CORE_DIRS += core/dmr/trunk
+endif
 ifeq ($(CONFIG_C4FM),y)
-CORE_DIRS += core/c4fm core/mbe core/fec
+CORE_DIRS += core/c4fm
 endif
 ifeq ($(CONFIG_HOSTLINK),y)
 CORE_DIRS += core/hostlink
@@ -99,6 +113,22 @@ CORE_DIRS += core/stubentry
 endif
 ifeq ($(CONFIG_APRS),y)
 CORE_DIRS += core/aprs
+endif
+ifeq ($(CONFIG_AIR),y)
+CORE_DIRS += core/air core/fec
+endif
+ifeq ($(CONFIG_P25),y)
+CORE_DIRS += core/p25
+endif
+ifeq ($(CONFIG_NXDN),y)
+CORE_DIRS += core/nxdn
+endif
+ifeq ($(CONFIG_MBE),y)
+CORE_DIRS += core/mbe
+endif
+# C4FM's VW decoder needs the full-rate vocoder and the FEC, once (P25 may have them already)
+ifeq ($(CONFIG_C4FM),y)
+CORE_DIRS += $(filter-out $(CORE_DIRS),core/mbe core/fec)
 endif
 ifeq ($(CONFIG_POSITION),y)
 CORE_DIRS += core/position
@@ -303,8 +333,11 @@ RFOUNDRY_EMPTY :=
 RFOUNDRY_OFF := $(subst $(RFOUNDRY_EMPTY) ,$(strip ,),$(sort $(foreach f,$(filter-out $(BOARD_UNSUPPORTED) $(BOARD_NOT_WRITTEN),$(FEATURES)),\
 	$(if $(call feature_on,$(f)),,$(f)))))
 # The build's preset, VERSION preset=: the release variant (VARIANT, full without one), or custom when a
-# switch is set on the command line (a custom build: the build service sets every one)
+# switch is set on the command line. The build service sets every switch, and passes RFOUNDRY_PRESET=<variant> when
+# they are a variant's (the start language aside), so an update keeps the radio on that variant
 RFOUNDRY_PRESET := $(if $(strip $(foreach v,$(filter CONFIG_%,$(.VARIABLES)),$(filter command line,$(origin $(v))))),custom,$(or $(VARIANT),full))
+$(if $(filter $(RFOUNDRY_PRESET),full custom $(basename $(notdir $(wildcard config/variants/*.mk)))),,\
+	$(error unknown RFOUNDRY_PRESET=$(RFOUNDRY_PRESET): full, custom or a variant))
 
 # Rebuild everything when the compile flags change (feature switches and build values), and the objects that carry
 # the version when it changes. Checked while the Makefile is read, before make looks at any object: the stale objects
@@ -322,10 +355,16 @@ $(shell echo '$(RFOUNDRY_PRESET) $(RFOUNDRY_OFF)' | cmp -s - $(BUILD)/build_info
 	rm -f $(BUILD)/core/hostlink/build_info.o; })
 # The About page's authors and third-party list (tools/gen_about.py), and the objects that include it when it changed
 ABOUT_OBJ := $(patsubst %.c,$(BUILD)/%.o,$(shell grep -l rfoundry_about.h $(APP_SRC) 2>/dev/null))
-$(shell python3 tools/gen_about.py AUTHORS platform/$(PLATFORM)/THIRD_PARTY $(BUILD)/gen/rfoundry_about.h | grep -q changed \
+# A feature built from third-party code adds its own list
+ABOUT_MORE :=
+ifeq ($(CONFIG_IMBE),y)
+ABOUT_MORE += core/mbe/THIRD_PARTY
+endif
+$(shell python3 tools/gen_about.py AUTHORS platform/$(PLATFORM)/THIRD_PARTY $(BUILD)/gen/rfoundry_about.h $(ABOUT_MORE) | grep -q changed \
 	&& rm -f $(ABOUT_OBJ))
-# The language tables (tools/i18n.py, core/ui/lang/*.po); i18n.o is rebuilt when they changed. A failure stops the
-# build: the old tables would link without a word
+# The language tables (tools/i18n.py, core/ui/lang/*.po) and the text keys every file that includes i18n.h needs
+# (tr_keys.h, rewritten only when a key changed: the dependency files rebuild those); i18n.o is rebuilt when the tables
+# changed. A failure stops the build: the old tables would link without a word
 I18N_GEN := $(shell python3 tools/i18n.py --gen $(BUILD)/gen/lang_tables.h || echo i18n-failed)
 ifneq ($(filter i18n-failed,$(I18N_GEN)),)
 $(error tools/i18n.py --gen failed (above))

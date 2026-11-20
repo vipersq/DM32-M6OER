@@ -31,6 +31,10 @@
 #include "ui/ui_screens.h"
 #include "ui/gfx.h"
 
+// A message as long as a DMR message can be (143 characters): the message screen shortens it
+#define LONG_SMS "Your_Special_Configuration_is:_Active_SMS:_LONG_SMS_Delay:_2.5_s_Retries:_3_Language:_English_" \
+	"Time_zone:_UTC_Units:_metric_Echo:_off_Thanks."
+
 // Screens for the gallery: a name and the script that reaches it from Home (zone 0, channel 3, a DMR channel)
 static const struct { const char *name, *script; } gallery[] = {
 	{ "boot", "splash" },
@@ -59,6 +63,9 @@ static const struct { const char *name, *script; } gallery[] = {
 	{ "banner_call_alert", "alert:9995678" },
 	{ "banner_radio_check", "call:9991234,91,g wait:11000 ctx 4 wait:1000" },
 	{ "message_view", "msg:9991234,Meet_at_the_north_lot_in_15_minutes._Bring_the_spare_battery. ctx" },
+	// a text the message screen shortens: Full message, and the whole text on its own page
+	{ "message_long", "msg:9991234," LONG_SMS " ctx" },
+	{ "message_read", "msg:9991234," LONG_SMS " ctx ok" },
 	{ "quick_dmr", "quick" },
 	{ "quick_fm", "down quick" },
 	{ "quick_fm_squelch", "down quick 2 up" },
@@ -145,11 +152,16 @@ static const struct { const char *name, *script; } gallery[] = {
 	{ "diagnostics", "ok 6 7" },
 	{ "roaming", "ok 6 6 1 wait:4000" },
 	{ "settings", "ok 7" },
+	{ "settings_sound", "ok 7 1" },
+	{ "settings_sound_tones", "ok 7 1 down down down down down down" },	// the tones (radio-features.md)
 	{ "settings_display", "ok 7 2" },
 	{ "settings_editor", "ok 7 2 ok up" },
 	{ "settings_freq_trim", "trim ok 7 up ok up" },	// on a radio with a reference trim (radio-features.md 6.1)
 	{ "freq_trim", "trim ok 7 up ok up ok ctx 4 5 ok" },
 	{ "freq_trim_typing", "trim ok 7 up ok up ok 1 2" },
+	{ "settings_signaling", "ok 7 up up ok" },	// Settings > Signaling tones (radio-features.md 4.3)
+	{ "signaling_steps", "ok 7 up up ok down down down down down down ok" },
+	{ "signaling_step_edit", "ok 7 up up ok down down down down down down ok ok 1 5 7 0" },
 	{ "settings_advanced", "ok 7 up ok" },
 	{ "factory_reset", "ok 7 up ok down down down ok" },
 	{ "about", "ok 7 up ok ok" },
@@ -219,6 +231,7 @@ static const struct { const char *name, *script; } audit_extra[] = {
 	{ "settings_power", "ok 7 7" DOWN12 },
 	{ "settings_keys", "ok 7 8" DOWN12 },
 	{ "settings_my_radio", "ok 7 0" DOWN12 },
+	{ "settings_signaling", "ok 7 up up ok" DOWN12 },
 	{ "settings_advanced", "ok 7 up ok" DOWN12 },
 	{ "about_scrolled", "ok 7 up ok ok" DOWN12 DOWN12 },
 	{ "codeplug", "ok 7 up ok down ok" },

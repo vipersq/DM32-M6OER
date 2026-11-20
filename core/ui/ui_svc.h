@@ -10,9 +10,21 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "config.h"
+#include "i18n.h"
 #include "radio/radio.h"
 #include "codeplug/zone_edit.h"
+#if CONFIG_P25
+#include "p25/p25_codeplug.h"
+#endif
+#if CONFIG_NXDN
+#include "nxdn/nxdn_codeplug.h"
+#endif
+
+// The UI services' one radio view copy (the UI task's only; too big for its stack). A service fetches it with
+// radio_get_view and reads it before returning: nothing may hold it across a call into another service
+extern radio_view_t ui_svc_view;
 
 // --- What is available (screens gray out what isn't, and say why on SELECT) ---
 #define UI_FEAT_TALK_TARGET	(1u << 0)	// ui_svc_talk_to / ui_svc_focus_target (dmr-voice)
@@ -37,6 +49,8 @@
 #define UI_FEAT_ZONE_SHARE	(1u << 19)	// ui_svc_zone_* (zone sharing over DMR data, CONFIG_ZONE_SHARE)
 #define UI_FEAT_VOLUME_KNOB	(1u << 21)	// the MCU reads a volume knob (radio_volume_knob): Settings > Key lock > Knob when locked
 #define UI_FEAT_REF_TRIM	(1u << 20)	// a reference trim (hal_radio_t.ref_trim, radio/ref_trim.h): Freq trim setting
+#define UI_FEAT_P25		(1u << 22)	// P25 on this board (CONFIG_P25, radio_p25_fits): the VFO's mode tile offers it
+#define UI_FEAT_NXDN		(1u << 23)	// NXDN on this board (CONFIG_NXDN, radio_nxdn_fits): the same
 uint32_t ui_svc_features(void);
 // The parts of it each package reports (ui_svc_features ORs them): dmr-voice / radio core, dmr-data, storage-cps,
 // radio-features
@@ -65,6 +79,12 @@ bool ui_svc_dmr_color_code(uint8_t cc);
 // The VFO's SFR role (CONFIG_SFR, sfr.md 4): a as a channel's SFR byte A; false: not in this build
 bool ui_svc_vfo_sfr(uint8_t a);
 bool ui_svc_mode(uint8_t mode);			// radio_mode_t: the VFO's mode (a channel's goes through Copy to VFO)
+// A channel mode's name as the screens show it (radio_mode_t). A name, never translated
+static inline const char *ui_mode_name(uint8_t mode)
+{
+	return mode == RADIO_MODE_DMR ? "DMR" : mode == RADIO_MODE_P25 ? "P25" : mode == RADIO_MODE_NXDN ? "NXDN" :
+	       mode == RADIO_MODE_C4FM ? "C4FM" : "FM";
+}
 // Copy to VFO: the channel on view into the VFO, which opens (CONFIG_VFO). Returns a radio_vfo_copy_t: VFO_COPY_OK
 // when the request went to the radio core, else why nothing changed
 uint8_t ui_svc_vfo_copy(const radio_view_t *v);
@@ -75,8 +95,25 @@ bool ui_svc_vox(bool on);
 // Make temporary channel changes permanent (storage-cps): false when busy, off a stored channel, or unavailable
 bool ui_svc_save_channel(void);
 // Store a whole channel (the channel editor, ui.md 2.1) at number 1..CODEPLUG_CHANNELS_MAX, as a storage job like
-// ui_svc_save_channel. false: a write is still going on, or no codeplug storage in this build
-bool ui_svc_write_channel(uint16_t number, const channel_t *ch);
+// ui_svc_save_channel. from: the stored channel ch is a copy of (number itself when edited in place), 0 = none; a
+// copy of a channel of a kind takes its mode with it (channel-modes.md 2.4). false: a write is still going on, or no
+// codeplug storage in this build
+bool ui_svc_write_channel(uint16_t number, const channel_t *ch, uint16_t from);
+#if CONFIG_P25 || CONFIG_NXDN
+// A P25 or NXDN channel's own settings, its tag's parameter block (p25-codeplug.md 2, nxdn-codeplug.md 2)
+typedef union {
+#if CONFIG_P25
+	p25_conv_t p25;
+#endif
+#if CONFIG_NXDN
+	nxdn_conv_t nxdn;
+#endif
+} ui_air_conv_t;
+// ui_svc_write_channel for a P25 or NXDN channel (ch's kind, or a plain one in that mode) with conv as its block: the
+// channel editor's NAC, RAN and rate. A plain channel takes its talk target and talkaround from the radio's settings
+// as it does without conv
+bool ui_svc_write_channel_air(uint16_t number, const channel_t *ch, uint16_t from, const ui_air_conv_t *conv);
+#endif
 #if CONFIG_CONTACT_EDIT
 // Store a contact (the contact editor, ui.md 2.4) at index 1..CODEPLUG_CONTACTS_MAX, as a storage job. false: a write
 // is still going on, or no codeplug storage in this build
@@ -124,6 +161,20 @@ bool ui_svc_vfo_get(uint8_t index, channel_t *out);
 
 // --- DMR repeater roaming (the radio core, docs/spec/dmr-roaming.md). Its state is radio_view_t.roam ---
 bool ui_svc_roam(uint8_t cmd);			// radio_roam_cmd_t: zone on / off, roam now, lock / unlock
+
+#if CONFIG_DMR_TRUNK
+// --- Trunked channels (docs/spec/dmr-trunking-codeplug.md 4). The system in use is radio_view_t.t3 ---
+// The system of channel num, read as ch (-1: not a trunked channel; 0xFF: it names none); *usable (may be NULL): the
+// system is set up
+int ui_svc_t3_channel(uint16_t num, const channel_t *ch, bool *usable);
+bool ui_svc_t3_name(uint8_t n, char *name);	// system n's name (CODEPLUG_NAME_LEN + 1); false: no such system
+void ui_svc_t3_poll(uint32_t id);	// poll an MS for its short data (radio_req_t3_poll)
+// CONFIG_DMR_TRUNK_GW (else no-ops): the digits ("0-9*#", up to 16) the next call through a dialing gateway sends,
+// and whether src is a dialing gateway on the system in use (false: no, or not this build); out: the caller's number
+// it gave for its call being followed now, "" when it gave none
+void ui_svc_t3_dial(const char *digits);
+bool ui_svc_t3_cli(uint32_t gw, char *out, size_t len);
+#endif
 
 // --- Beeps (radio-features): the radio sounds key beeps only when its key_beep setting is on ---
 typedef enum { UI_BEEP_KEY, UI_BEEP_ERROR, UI_BEEP_MESSAGE, UI_BEEP_BATTERY_LOW } ui_beep_t;
@@ -251,6 +302,7 @@ typedef struct {
 	uint32_t src;		// the sender's DMR ID
 	uint8_t channels;	// in the record
 	uint8_t in_band;	// of them, the ones this radio can receive (the rest are left out)
+	uint8_t unavailable;	// of those, channels on a system the radio doesn't have: they come in unavailable
 	char name[17];		// the zone's (or channel's) name as sent
 	char from[17];		// the sender's contact name, "" when not a contact
 } ui_zone_offer_t;
@@ -265,6 +317,7 @@ typedef struct {
 	uint32_t rx_hz;
 	bool dmr;
 	bool in_band;
+	bool unavailable;	// on a system the radio doesn't have
 } ui_zone_offer_ch_t;
 bool ui_svc_zone_offer_channel(uint32_t serial, uint16_t i, ui_zone_offer_ch_t *out);
 void ui_svc_zone_offer_reject(uint32_t serial);
@@ -327,8 +380,8 @@ typedef enum {
 	UI_SET_MIC_AGC,		// the vocoder's mic AGC on DMR TX (accent bits 6-7); while on, mic gain is step 5 and dimmed
 	UI_SET_SFR_RX,		// what an SFR user channel hears, dmr_sfr_rx_t (Settings > Talk, CONFIG_SFR; radio_settings_t.sfr_rx)
 	UI_SET_SFR_CWID,	// the SFR repeater's CW ID interval code 0..4 (Settings > Talk, CONFIG_SFR_CWID; radio_settings_t.sfr_cwid)
-	// The VFO's automatic step in the broadcast band (Settings > Talk, CONFIG_BCAST_FM; radio_settings_t.bcast_step) in
-	// kHz: 200 (the odd tenths) or 100
+	// The VFO's step in the broadcast band, whatever the VFO step (Settings > Talk, CONFIG_BCAST_FM;
+	// radio_settings_t.bcast_step) in kHz: 200 (the odd tenths) or 100
 	UI_SET_BCAST_STEP,
 	UI_SET_ZONE_OFFERS,	// accept zone shares from other radios: 1 on (the default), 0 off (settings_t.zs_offers)
 	UI_SET_DMR_ID,		// the radio's own DMR ID in the codeplug, 1..CODEPLUG_DMR_ID_MAX (a set is a codeplug write job)
@@ -336,7 +389,7 @@ typedef enum {
 	UI_SET_LANGUAGE,	// the UI's language, i18n.h lang_value: "en" English, 0 never picked (Settings > Display; settings_t.lang)
 	UI_SET_RX_EXT,		// receive past the band table (Settings > Advanced; settings_t.cp_flags, CONFIG_RX_EXT)
 	// Knob when locked: 1 the volume knob works while the keys are locked (the default), 0 it does nothing
-	// (UI_FEAT_VOLUME_KNOB; settings_t.knob_flags bit SETTINGS_KNOB_LOCK, stored inverted)
+	// (UI_FEAT_VOLUME_KNOB; settings_t.sound_flags bit SETTINGS_KNOB_LOCK, stored inverted)
 	UI_SET_KNOB_WHEN_LOCKED,
 	// The position service's settings (Settings > Location, CONFIG_POSITION; core/position/position.h): where our
 	// position comes from (position_pref_t), the fixed position in 1e-7 degree (both 0 = not set), our position
@@ -350,6 +403,27 @@ typedef enum {
 	// docs/spec/codeplug-settings.md), which the radio core takes when codeplug_kv_serial() moves on
 	UI_SET_ARS_SERVER,
 	UI_SET_IP_GATEWAY,
+	// Settings > Sound, 1 on (the default), 0 off. Tones kept as keys of the settings area over the radio core's
+	// radio_settings_t.tones_off (radio_keys.h radio_tone_rows), set as above
+	UI_SET_CALL_END_TONE,	// DMR: a call heard has ended
+	UI_SET_TOT_WARN_TONE,	// the TX time-out is near
+	UI_SET_BATTERY_TONE,	// low and critical battery
+	UI_SET_TX_DENY_TONE,	// PTT refused, or a transmission cut by the time-out
+	// ... and two kept where they already were: the scan stop tone (radio_settings_t.scan_beep, off by default) and
+	// the emergency tone for an alert heard (dmr_emergency_settings_t.rx_tone, CONFIG_DMR_EMERGENCY)
+	UI_SET_SCAN_TONE,
+	UI_SET_EMERGENCY_TONE,
+	// Signaling tones (Settings > Signaling tones; radio_settings_t.sig_dmr / sig_fm / sig_hz / sig_ms,
+	// core/radio/sigtone.h): per event (start of a transmission, its end, a reception's end) where it sounds in DMR and
+	// in FM (sig_out_t), then the event's chain of ten steps, a frequency in Hz and a length in ms (0 ends it). Each
+	// group is the events in order: UI_SET_SIG_DMR + sig_event_t, UI_SET_SIG_HZ + 10 * event + step
+	UI_SET_SIG_DMR, UI_SET_SIG_DMR_LAST = UI_SET_SIG_DMR + 2,
+	UI_SET_SIG_FM, UI_SET_SIG_FM_LAST = UI_SET_SIG_FM + 2,
+	UI_SET_SIG_HZ, UI_SET_SIG_HZ_LAST = UI_SET_SIG_HZ + 29,
+	UI_SET_SIG_MS, UI_SET_SIG_MS_LAST = UI_SET_SIG_MS + 29,
+	// One step of a chain, set whole (its frequency and length in one write of the settings area): the value is
+	// UI_SIG_STEP(event, step, Hz, ms). Write only
+	UI_SET_SIG_STEP,
 	UI_SET_C4FM_DGID,	// C4FM: the DG-ID we send and hear, 0-99, 0 = all (Settings > C4FM, CONFIG_C4FM; settings_t.c4fm_dgid)
 	// Settings > C4FM (CONFIG_C4FM; settings_t, docs/spec/c4fm.md 6): TX deviation 70-130 %, preamble 100-500 ms, the
 	// decoded voice's level -6..+12 dB (also DMR), an FT-70D's fields 1 / plain 0, and the test tone (RAM only:
@@ -373,8 +447,8 @@ typedef enum {
 	UI_SET_TAC_STYLE,	// ... the tactical tones' style, 0..BEEP_TAC_STYLES - 1 (radio_settings_t.tac_style)
 	UI_SET_TAC_RXEND,	// ... the reception end tone, 1 on
 	// Settings > Roger & tones: the tactical tones and the roger sound per mode, 1 on (radio_settings_t.tones_off /
-	// roger_off, a bit per radio_mode_t, set = off): UI_SET_TONES_FM + mode, UI_SET_ROGER_FM + mode
-	UI_SET_TONES_FM, UI_SET_TONES_DMR, UI_SET_TONES_C4FM,
+	// roger_off, a bit per radio_mode_t, set = off; ui_tone_id_mode gives the mode of an ID)
+	UI_SET_TONES_FM, UI_SET_TONES_DMR, UI_SET_TONES_C4FM, UI_SET_TONES_P25, UI_SET_TONES_NXDN,
 	UI_SET_ROGER_FM, UI_SET_ROGER_DMR, UI_SET_ROGER_C4FM,
 	UI_SET_CH_WIDE,
 	UI_SET_CH_RX_TONE,
@@ -387,6 +461,21 @@ typedef enum {
 	UI_SET_TAC_ALL,		// Settings > Tactical > Everything tactical: the red screen, LEDs off and the three tones at once
 	UI_SET_COUNT
 } ui_setting_t;
+
+// The radio_mode_t a Settings > Roger & tones ID is for (UI_SET_TONES_* and UI_SET_ROGER_*, in FM, DMR, C4FM, P25, NXDN
+// order), 0xFF for another ID
+static inline uint8_t ui_tone_id_mode(uint8_t id)
+{
+	static const uint8_t modes[5] = { RADIO_MODE_FM, RADIO_MODE_DMR, RADIO_MODE_C4FM, RADIO_MODE_P25, RADIO_MODE_NXDN };
+	if (id >= UI_SET_TONES_FM && id <= UI_SET_TONES_NXDN)
+		return modes[id - UI_SET_TONES_FM];
+	if (id >= UI_SET_ROGER_FM && id <= UI_SET_ROGER_C4FM)
+		return modes[id - UI_SET_ROGER_FM];
+	return 0xFFu;
+}
+
+// The value of UI_SET_SIG_STEP: the frequency in bits 0-11, the length in 10 ms units in 12-18, the step in 19-22, the event in 23-24
+#define UI_SIG_STEP(ev, k, hz, ms)	((int32_t)(((hz) & 0xFFFu) | ((((ms) / 10u) & 0x7Fu) << 12) | (((k) & 15u) << 19) | (((ev) & 3u) << 23)))
 
 // UI_SET_ACCENT values: the theme's own highlight (blue), or one of seven. Color displays only
 enum {
@@ -426,12 +515,13 @@ typedef enum {
 	UI_EV_HOTSPOT_STARTED,	// the host started hotspot mode
 	UI_EV_SCAN_STOPPED,	// the scan stopped on a channel
 	UI_EV_CALL_ALERT_RESULT,	// our call alert: ok = the radio answered, else no answer after the retries
-	UI_EV_SAVE_FAILED,	// a save to the codeplug the UI asked for failed later (text: what failed)
+	UI_EV_SAVE_FAILED,	// a save to the codeplug the UI asked for failed later (why: what failed)
 	UI_EV_POWER_OFF_FAILED,	// auto power off dropped the power latch but the radio is still on (the knob holds it)
 	UI_EV_ZONE_OFFER,	// another radio (id, name) offers a zone or channel (index 1): text "Zone Club, 24 channels"
 	UI_EV_ZONE_SENT,	// our zone to id (index 1: a talkgroup): ok = it went out whole
-	UI_EV_ZONE_IMPORTED,	// the import ended: ok with name (the zone here), index (channels), id 1 for an update; else
-				// text says why
+	UI_EV_ZONE_IMPORTED,	// the import ended: ok with name (the zone here), index (channels), id 1 for an update, ms
+				// the channels of a kind that can't be used (their system isn't set up here); else why
+				// says why
 	UI_EV_CODEPLUG_FOREIGN,	// a codeplug write is held: ask what to do with another firmware's codeplug
 } ui_event_kind_t;
 
@@ -442,7 +532,10 @@ typedef struct {
 	uint32_t id;
 	uint32_t ms;
 	char name[17];
-	char text[40];
+	union {
+		char text[40];
+		tr_id_t why;	// UI_EV_SAVE_FAILED, UI_EV_ZONE_IMPORTED: what failed, a key (TR_NONE: none)
+	};
 } ui_event_t;
 // The owner's two boot screen lines from the codeplug (storage-cps); empty strings when there are none
 void ui_svc_boot_text(char line1[17], char line2[17]);
@@ -462,5 +555,10 @@ void ui_svc_poll(void);
 // Every UI pass: the side key assignment follows a codeplug a CPS wrote, and a change made in Settings goes to the
 // codeplug (CONFIG_KEY_ASSIGN)
 void ui_svc_keys_poll(void);
+// A home key's event (ACT_HOME_KEY_n, board.home_keys): the action it does now, its function on Home (home true) or
+// the key's own action elsewhere; ACT_NONE for nothing. Any other action comes back as it is (CONFIG_KEY_ASSIGN)
+uint8_t ui_svc_home_key(uint8_t action, uint8_t gesture, bool home);
+// Settings > Keys: value may go in the setting id's slot (a home key's role can't hold Monitor or Tone burst)
+bool ui_svc_key_offered(uint8_t id, int32_t value);
 
 #endif

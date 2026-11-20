@@ -96,6 +96,24 @@ continuation keeps the reserved bytes and the header length as it found them.
 |---|---|---|---|---|---|
 | 0x0001 | ARS server | id | The presence server's DMR ID for ARS registration ([dmr-data.md](dmr-data.md) 6); 0 = ARS off | `ds_ars_server` | ARS in the build (`CONFIG_DMR_ARS`) |
 | 0x0002 | IP gateway | id | The DMR ID of the radio that takes the host's off-net IP packets ([usb-network.md](usb-network.md) 3.1); 0 = none | `ds_ip_gateway` | IP gateway in the build (`CONFIG_DMR_IP_GATEWAY`) |
+| 0x0003 | Call end tone | bool | Off silences the tone when a DMR call heard ends (Settings > Sound) | `sound_flags` bit 4 | DMR and tones in the build (`CONFIG_DMR`, `CONFIG_BEEP`) |
+| 0x0004 | TOT warning tone | bool | Off silences the tone before the transmit time-out | `sound_flags` bit 5 | Tones in the build (`CONFIG_BEEP`) |
+| 0x0005 | Battery tone | bool | Off silences the low and critical battery tones | `sound_flags` bit 6 | Tones in the build (`CONFIG_BEEP`) |
+| 0x0006 | TX denied tone | bool | Off silences the tone when PTT is refused or the time-out cuts a transmission | `sound_flags` bit 7 | Tones in the build (`CONFIG_BEEP`) |
+| 0x0007 | Start tone | record | The signaling tone of a transmission's start: outputs and chain (3.3) | `sig_dmr[0]`, `sig_fm[0]`, `sig_hz[0]`, `sig_ms[0]` | Signaling tones in the build (`CONFIG_SIG_TONES`) |
+| 0x0008 | End tone | record | The same for a transmission's end | `sig_dmr[1]`, `sig_fm[1]`, `sig_hz[1]`, `sig_ms[1]` | `CONFIG_SIG_TONES` |
+| 0x0009 | Idle tone | record | The same for a reception's end (no on-air output) | `sig_dmr[2]`, `sig_fm[2]`, `sig_hz[2]`, `sig_ms[2]` | `CONFIG_SIG_TONES` |
+| 0x0100 | Systems | record list | 0x0100-0x01FF: system n's record ([channel-modes.md](channel-modes.md) 7.1) | none (codeplug data) | the system's type built |
+| 0x0200 | System entries | record list | 0x0200-0x02FF: a system's sites, channels and plan rows ([channel-modes.md](channel-modes.md) 7.2) | none | the system's type built |
+| 0x0300 | System secrets | record list | 0x0300-0x03FF: system n's own secret ([channel-modes.md](channel-modes.md) 7.4) | none | the system's type built |
+| 0x0400 | Channel tags | record list | 0x0400-0x07FF: channel n + 1's kind and parameters ([channel-modes.md](channel-modes.md) 2) | none | read in every build |
+| 0x0800 | Short data poll | record list | 0x0800-0x08FF: DMR Tier III system n's short data poll format, size and the radio's reply ([dmr-trunking-codeplug.md](dmr-trunking-codeplug.md) 5) | none: ISO 8 bit, 4 blocks, no reply | Tier III trunking in the build (`CONFIG_DMR_TRUNK`) |
+| 0x0900 | Supplementary data | record list | 0x0900-0x09FF: the supplementary user data format and octets the radio offers with each call on DMR Tier III system n ([dmr-trunking-codeplug.md](dmr-trunking-codeplug.md) 5) | none: no data offered | Tier III supplementary data in the build (`CONFIG_DMR_TRUNK_SUPL`) |
+| 0x0A00 | Mode settings | record list | 0x0A00-0x0AFF: kind n's radio-wide record ([channel-modes.md](channel-modes.md) 5.5) | none | the kind built |
+| 0x1000 | Targets | record list | 0x1000-0x17FF: call targets the contact record can't hold ([channel-modes.md](channel-modes.md) 5.2) | none | a kind that uses them built |
+| 0x1800 | Target lists | record list | 0x1800-0x18FF: receive lists of targets ([channel-modes.md](channel-modes.md) 5.3) | none | a kind that uses them built |
+| 0x1900 | Traffic keys | record list | 0x1900-0x1CFF: keys that encrypt traffic, each a system's ([channel-modes.md](channel-modes.md) 5.4) | none | a type that uses them built |
+| 0x1D00 | Zone tags | record list | 0x1D00-0x1DFF: reserved for per-zone mode records ([channel-modes.md](channel-modes.md) 5.6) | none | none yet |
 
 **Radio's own copy** is the setting's field in the settings store ([settings-store.md](settings-store.md) 3). Every
 scalar key has one (3.2).
@@ -161,6 +179,29 @@ button's action. Ranges are assigned in blocks of 256 from 0x0100 up (0x0100-0x0
 to its block and no further without a new row. A list that may outgrow a block is split into two families by the
 change that needs it, never by moving the first.
 
+### 3.3 The signaling tone records
+
+One record per event, because a chain's steps are only valid together and the outputs go with the event they sound
+for. 32 bytes, little endian (the first version's record had five steps and 17 bytes: the first five steps are laid out as
+it had them, and the other five follow):
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 1 | Output in DMR: 0 the radio's own sound, 1 off, 2 speaker, 3 on air, 4 speaker and on air |
+| 1 | 1 | Output in FM, the same values |
+| 2 | 10 | Frequencies of steps 1 to 5 in Hz, u16 each; 0 is a pause. Multiples of 10, at most 3400 |
+| 12 | 5 | Lengths of steps 1 to 5 in units of 10 ms. A step of length 0 ends the chain, and a chain with no step is the event's own sound. At most 90 (900 ms) |
+| 17 | 10 | Frequencies of steps 6 to 10, as above |
+| 27 | 5 | Lengths of steps 6 to 10, as above |
+
+- A record shorter than 32 bytes (the first version's 17, say) reads with the missing fields zero. A longer one (a later version) is read from the
+  front.
+- The record is absent for the reader when a field is outside what the setting takes: an output of 3 or 4 for the end
+  of a reception, a frequency over 3400 Hz or not a multiple of 10, or a length over 900 ms. Nothing is
+  clamped (3.1).
+- A record whose key is present holds over the radio's own copy (5.2). The radio writes the whole record when one of
+  its fields changes from the menu, and keeps the bytes after the 32nd (4).
+
 ## 4. Rules for readers and writers
 
 - **Absent means "the codeplug says nothing".** The firmware then keeps what it already has (5). It is not the same
@@ -207,9 +248,10 @@ the shared sector buffer, or when the storage region isn't ours ([settings-store
 
 Scalar keys are applied through tables (`core/codeplug/codeplug_keys.c`). An owner of settings has one table, a row
 per key: the key, its type, the setting's range, whether the build has it, and the offset and size of a field in the
-owner's settings struct. The owner is whatever holds that struct: the data service's settings are the radio core's
-(`radio_keys` in `core/radio/radio_keys.h`), a block of UI settings would be the UI's, in `core/ui/`. There is no
-table of all keys: the radio core doesn't reach into the UI's settings, nor the other way.
+owner's settings struct, so a struct has one table. The owner is whatever holds that struct: the radio core holds
+the data service's settings (`radio_keys` in `core/radio/radio_keys.h`) and the Settings > Sound tones
+(`radio_tone_rows`, next to it), and a block of UI settings would be the UI's, in `core/ui/`. There is no table of all
+keys: the radio core doesn't reach into the UI's settings, nor the other way.
 
 | Call | |
 |---|---|
@@ -221,8 +263,10 @@ An owner uses them the same way everywhere: read its settings, apply the table, 
 anything changed. A new scalar key is a row there, a row in section 3 and a row in the Codeplug Editor (7), and no
 code.
 
-A setting that isn't a plain field (bits packed into a byte) is unpacked by its owner into a plain struct first. A
-record key is read and written by its owner with `codeplug_kv_get` and a `CODEPLUG_KV_HEAD` set.
+A setting that isn't a plain field (bits packed into a byte) is unpacked by its owner into a plain struct first. The
+tones are: `radio_settings_t.tones_off` holds a bit per tone, set when it is off, and `radio_tones_unpack` /
+`radio_tones_pack` turn it into the four bools of `radio_tones_t` and back. A record key is read and written by its
+owner with `codeplug_kv_get` and a `CODEPLUG_KV_HEAD` set.
 
 ### 5.2 A key and the radio's own copy
 
@@ -245,7 +289,8 @@ record key is read and written by its owner with `codeplug_kv_get` and a `CODEPL
 - **A factory reset** resets the radio's own copies and leaves the codeplug, so a key that is present still holds.
 
 The ARS server and the IP gateway are set from the menu (Settings > Connections > Data services, [ui.md](ui.md)) and
-the debug link's DMR_DATA SETTINGS and IP_SETTINGS ([debuglink.md](debuglink.md) 3.12).
+the debug link's DMR_DATA SETTINGS and IP_SETTINGS ([debuglink.md](debuglink.md) 3.12). The tones are set from
+Settings > Sound.
 
 Debug link view `cps`: `cpkv.state` (`valid`, `empty`: no area, `bad`: invalid, `newer`: a later version),
 `cpkv.length` (data length) and `cpkv.keys` (entries).
@@ -314,5 +359,5 @@ conversion copies the entries as they are. There is one key space for both forma
   radio accepts) is not built.
 - The header is outside the CRC. A damaged version byte reads as an invalid area (version 0) or as a newer one.
 - Per-channel settings: a key whose value starts with a channel number, or a table key. Not needed yet.
-- No key is a record yet. The firmware's set from the front (`CODEPLUG_KV_HEAD`) is built and tested; the Codeplug
-  Editor's comes with the first record key.
+- The signaling tone records (3.3) are the first record keys: the firmware sets them from the front
+  (`CODEPLUG_KV_HEAD`, `codeplug_keys_store_record`) and so does the Codeplug Editor (`putKeys`).

@@ -13,6 +13,7 @@
 #include "radio/ref_trim.h"
 #include "radio/radio_cwid.h"
 #include "radio/radio_bcast.h"
+#include "codeplug/codeplug_modes.h"	// channel kinds: a trunked one is never watched
 #include "input/input.h"
 #include "settings/settings.h"
 #include <string.h>
@@ -26,6 +27,13 @@
 #if CONFIG_DMR
 #include "dmr/ambe/ambeVoice.h"
 #endif
+#if CONFIG_NXDN
+#include "radio/radio_nxdn.h"
+#endif
+#if CONFIG_P25
+#include "radio/radio_p25.h"
+#endif
+
 
 uint32_t ui_svc_feat_voice(void)
 {
@@ -77,10 +85,10 @@ int32_t ui_svc_fm_get(uint8_t id)
 	case UI_SET_TAC_LEDS: return s->leds_off;
 	case UI_SET_TAC_STYLE: return s->tac_style;
 	case UI_SET_TAC_RXEND: return s->tac_rxend;
-	case UI_SET_TONES_FM: case UI_SET_TONES_DMR: case UI_SET_TONES_C4FM:
-		return (s->tones_off & (1u << (id - UI_SET_TONES_FM))) == 0;
+	case UI_SET_TONES_FM: case UI_SET_TONES_DMR: case UI_SET_TONES_C4FM: case UI_SET_TONES_P25: case UI_SET_TONES_NXDN:
+		return (s->tac_tones_off & (1u << ui_tone_id_mode(id))) == 0;
 	case UI_SET_ROGER_FM: case UI_SET_ROGER_DMR: case UI_SET_ROGER_C4FM:
-		return (s->roger_off & (1u << (id - UI_SET_ROGER_FM))) == 0;
+		return (s->roger_off & (1u << ui_tone_id_mode(id))) == 0;
 	default: return s->roger_beep ? (int32_t)s->roger_sound + 1 : 0;
 	}
 }
@@ -88,11 +96,11 @@ int32_t ui_svc_fm_get(uint8_t id)
 void ui_svc_fm_set(uint8_t id, int32_t value)
 {
 	radio_settings_t was = *rs_copy();
-	if (id >= UI_SET_TONES_FM && id <= UI_SET_TONES_C4FM) {
-		uint8_t bit = (uint8_t)(1u << (id - UI_SET_TONES_FM));
-		rs.tones_off = (uint8_t)(value != 0 ? rs.tones_off & ~bit : rs.tones_off | bit);
+	if (id >= UI_SET_TONES_FM && id <= UI_SET_TONES_NXDN) {
+		uint8_t bit = (uint8_t)(1u << ui_tone_id_mode(id));
+		rs.tac_tones_off = (uint8_t)(value != 0 ? rs.tac_tones_off & ~bit : rs.tac_tones_off | bit);
 	} else if (id >= UI_SET_ROGER_FM && id <= UI_SET_ROGER_C4FM) {
-		uint8_t bit = (uint8_t)(1u << (id - UI_SET_ROGER_FM));
+		uint8_t bit = (uint8_t)(1u << ui_tone_id_mode(id));
 		rs.roger_off = (uint8_t)(value != 0 ? rs.roger_off & ~bit : rs.roger_off | bit);
 	} else if (id == UI_SET_TAC_RXEND) {
 		rs.tac_rxend = value != 0;
@@ -199,7 +207,8 @@ bool ui_svc_vfo_sfr(uint8_t a)
 #if CONFIG_FM
 bool ui_svc_mode(uint8_t mode)
 {
-	if (mode != RADIO_MODE_FM && mode != RADIO_MODE_DMR && !(CONFIG_C4FM && mode == RADIO_MODE_C4FM)) {
+	if (mode != RADIO_MODE_FM && mode != RADIO_MODE_DMR && !(mode == RADIO_MODE_P25 && CONFIG_P25) &&
+	    !(mode == RADIO_MODE_NXDN && CONFIG_NXDN) && !(CONFIG_C4FM && mode == RADIO_MODE_C4FM)) {
 		return false;
 	}
 	radio_req_mode(mode);
@@ -259,7 +268,14 @@ uint32_t ui_svc_feat_radio(void)
 	       (motor ? UI_FEAT_VIBRATE : 0) | (radio_volume_soft() ? UI_FEAT_VOLUME : 0) |
 	       (knob ? UI_FEAT_VOLUME_KNOB : 0) |
 	       (radio_bcast_capable() ? UI_FEAT_BCAST : 0) | (CONFIG_POSITION && board_has_gps() ? UI_FEAT_GPS : 0) |
-	       (ref_trim_available() ? UI_FEAT_REF_TRIM : 0);
+	       (ref_trim_available() ? UI_FEAT_REF_TRIM : 0) |
+#if CONFIG_P25
+	       (radio_p25_fits() ? UI_FEAT_P25 : 0) |
+#endif
+#if CONFIG_NXDN
+	       (radio_nxdn_fits() ? UI_FEAT_NXDN : 0) |
+#endif
+	       0;
 }
 
 #if CONFIG_DMR
@@ -318,8 +334,8 @@ bool ui_svc_dual(const ui_dual_ref_t ref[2], uint8_t sel)
 			if (!(CONFIG_VFO_FM || CONFIG_VFO_DMR))
 				return false;
 		} else if (r[i].pos >= CODEPLUG_ZONE_MAX || !codeplug_zone(r[i].zone, &z) || r[i].pos >= z.count ||
-			   !codeplug_channel(z.channels[r[i].pos], &ch)) {
-			return false;
+			   !codeplug_channel(z.channels[r[i].pos], &ch) || ch.kind == CODEPLUG_KIND_P25_TRUNK) {
+			return false;	// a trunked channel follows its system: not one to watch
 		}
 	}
 	if (sel > 1 || (r[0].vfo == r[1].vfo && r[0].zone == r[1].zone && r[0].pos == r[1].pos))
@@ -350,28 +366,28 @@ uint8_t ui_svc_receivers(void)
 // receiver doesn't have its channel (down, or not yet): the screens then show the main receiver alone
 bool ui_svc_dual_rx(uint8_t pane, ui_dual_rx_t *out)
 {
-	static radio_view_t v;	// the UI task's only; too big for its stack
+	radio_view_t *const v = &ui_svc_view;
 	radio_dual_ref_t ref[2];
 	uint8_t sel, at;
 	memset(out, 0, sizeof(*out));
 	if (board.rx2 == NULL || pane > 1 || !radio_get_dual(ref, &sel, &at)) {
 		return false;
 	}
-	radio_get_view(&v);
-	if (!v.rx2) {
+	radio_get_view(v);
+	if (!v->rx2) {
 		return false;
 	}
 	if (pane == sel) {
-		out->active = out->heard = v.state == RS_RX;
-		out->rssi_dbm = v.rssi_dbm;
-		out->dmr = v.ch.mode == RADIO_MODE_DMR;
+		out->active = out->heard = v->state == RS_RX;
+		out->rssi_dbm = v->rssi_dbm;
+		out->dmr = v->ch.mode == RADIO_MODE_DMR;
 #if CONFIG_DMR
 		if (out->dmr) {
-			out->active = out->heard = v.state == RS_RX && v.dmr.state == RDMR_RX;
-			out->src = v.dmr.call.src;
-			out->dst = v.dmr.call.dst;
-			out->group = v.dmr.call.group;
-			strncpy(out->src_name, v.dmr.call.src_name, sizeof out->src_name - 1);
+			out->active = out->heard = v->state == RS_RX && v->dmr.state == RDMR_RX;
+			out->src = v->dmr.call.src;
+			out->dst = v->dmr.call.dst;
+			out->group = v->dmr.call.group;
+			strncpy(out->src_name, v->dmr.call.src_name, sizeof out->src_name - 1);
 		}
 #endif
 		return true;
@@ -475,6 +491,11 @@ void ui_svc_apply(uint8_t id, int32_t value)
 	case UI_SET_TALK_PERMIT:
 		rs.talk_permit = value != 0;
 		break;
+	case UI_SET_SCAN_TONE:
+		rs.scan_beep = value != 0;
+		break;
+	case UI_SET_SIG_DMR ... UI_SET_SIG_STEP:	// a job in ui_svc_storage.c (the settings area's record), which sets them
+		return;
 	case UI_SET_VFO_STEP:		// 10 Hz units; 833 is the exact 8.33 kHz grid
 		radio_req_vfo_step_size(value == 833 ? 8333u : value > 0 && value <= 100000 ? (uint32_t)value * 10u : 0u);
 		return;
