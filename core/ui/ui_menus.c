@@ -15,6 +15,7 @@
 #include "codeplug/codeplug.h"
 #include "config.h"
 #include "hal_time.h"
+#include "radio/roger_sound.h"
 #include "radio/tones.h"
 #if CONFIG_C4FM
 #include "ui_modes.h"
@@ -5880,12 +5881,19 @@ static const set_item_t s_my_radio[] = {
 // A page's ACTION rows open the mode's screens and sub-pages
 static const int16_t v_bcl[] = { RADIO_BCL_OFF, RADIO_BCL_CARRIER, RADIO_BCL_WRONG_TONE };
 static const char *const n_bcl[] = { TRN("Off"), TRN("Carrier"), TRN("Wrong tone") };
+// The roger sound, every mode (radio/roger_sound.h): Off, then the sounds in roger_sound_t order (value = sound + 1)
+static const int16_t v_roger[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+static const char *const n_roger[] = { TRN("Off"), TRN("Classic"), TRN("Beep"), TRN("Double beep"),
+	TRN("Two-tone up"), TRN("Two-tone down"), TRN("Triple chirp"), TRN("Sweep up"), TRN("Sweep down"),
+	TRN("Bee-boo"), TRN("Morse K"), TRN("Morse R"), TRN("Quindar") };
+_Static_assert(sizeof v_roger / sizeof v_roger[0] == ROGER_COUNT + 1u, "Off and each roger sound");
+_Static_assert(sizeof n_roger / sizeof n_roger[0] == ROGER_COUNT + 1u, "Off and each roger sound");
 // Menu > FM: the receiver's rules, then the channel or VFO in use (the rows Quick has, in one place)
 static const set_item_t s_fm[] = {
 	NUMBER(TRN("Default squelch"), "FM squelch level", UI_SET_SQUELCH, 0, 9, 1, NULL),
 	LIST(TRN("Busy lockout"), "FM BCL busy channel lockout", UI_SET_FM_BCL, v_bcl, n_bcl),
 #if CONFIG_FM_TX_TONES
-	TOGGLE(TRN("Roger beep"), "FM end of transmission tone", UI_SET_FM_ROGER),
+	LIST(TRN("Roger sound"), "FM roger beep end of transmission tone", UI_SET_FM_ROGER, v_roger, n_roger),
 #endif
 	TOGGLE(TRN("Wide 25 kHz"), "FM bandwidth channel spacing", UI_SET_CH_WIDE),
 	NUMBER(TRN("RX tone"), "FM CTCSS DCS receive subtone", UI_SET_CH_RX_TONE, 0, TONES_PICKER_COUNT - 1, 1, NULL),
@@ -5906,6 +5914,7 @@ static const set_item_t s_dmr[] = {
 	TOGGLE(TRN("Show talker alias"), "DMR", UI_SET_ALIAS_SHOW),
 	TOGGLE(TRN("Talk permit tone"), "DMR", UI_SET_TALK_PERMIT),
 	ACTION(TRN("Data and messages"), "DMR radio check call alert SMS format", SA_DMR_DATA),
+	LIST(TRN("Roger sound"), "DMR roger beep end of transmission tone", UI_SET_FM_ROGER, v_roger, n_roger),
 };
 // Menu > C4FM
 static const set_item_t s_c4fm[] = {
@@ -5914,6 +5923,7 @@ static const set_item_t s_c4fm[] = {
 	NUMBER(TRN("DG-ID"), "C4FM DGID digital group Fusion", UI_SET_C4FM_DGID, 0, 99, 1, NULL),
 	ACTION(TRN("Callsign"), "C4FM callsign", SA_C4FM_CALL),
 	ACTION(TRN("Advanced"), "C4FM deviation preamble FT-70D test tone debug", SA_C4FM_ADV),
+	LIST(TRN("Roger sound"), "C4FM roger beep end of transmission tone", UI_SET_FM_ROGER, v_roger, n_roger),
 };
 // Menu > C4FM > Wires-X (and # on Home in C4FM): the node's status, its room; connect and disconnect. Opening it asks
 // the node for its status (a short transmission)

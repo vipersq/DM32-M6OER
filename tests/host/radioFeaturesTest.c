@@ -10,6 +10,7 @@
 #define board board_as_declared
 #include "board.h"
 #undef board
+#include "radio/roger_sound.h"
 #include "radio/radio_sm.h"
 #include "radio/scan.h"
 #include "radio/beep.h"
@@ -2534,6 +2535,72 @@ static void test_subtone_tail(void)
 	CHECK(sm.view.state != RS_TX && hw.tx_off_calls == 5);
 }
 
+static void set_roger_k(radio_settings_t *s) { s->roger_beep = true; s->roger_sound = ROGER_MORSE_K; }
+static void set_roger_double(radio_settings_t *s) { s->roger_beep = true; s->roger_sound = ROGER_DOUBLE; }
+static void set_roger_none(radio_settings_t *s) { s->roger_beep = false; s->roger_sound = 0; }
+
+// The roger sounds on the carrier (radio/roger_sound.h): each step's tone in turn, its pauses silent, then the unkey
+// at the sound's end; a sound past the table plays as the classic pair
+static void test_roger_sounds(void)
+{
+	start();
+	settings(set_roger_k);	// K: 800 Hz 150 ms, pause 50, 800 Hz 50, pause 50, 800 Hz 150 (450 ms)
+	req(RREQ_PTT, 1);
+	run(500);
+	unsigned off0 = hw.tx_off_calls;
+	req(RREQ_PTT, 0);
+	CHECK(sm.view.state == RS_TX && sm.view.roger && hw.tone_hz == 800);
+	run(160);
+	CHECK(sm.view.state == RS_TX && hw.tone_hz == 0);	// the gap after the dah
+	run(60);
+	CHECK(hw.tone_hz == 800);				// the dit
+	run(300);
+	CHECK(sm.view.state == RS_IDLE && !sm.view.roger && hw.tone_hz == 0 && hw.tx_off_calls == (int)off0 + 1);
+	settings(set_roger_double);	// 1200 Hz 75, pause 50, 1200 Hz 75
+	req(RREQ_PTT, 1);
+	run(500);
+	req(RREQ_PTT, 0);
+	CHECK(hw.tone_hz == 1200);
+	run(85);
+	CHECK(hw.tone_hz == 0 && sm.view.state == RS_TX);
+	run(50);
+	CHECK(hw.tone_hz == 1200);
+	run(150);
+	CHECK(sm.view.state == RS_IDLE && hw.tone_hz == 0);
+	// The table: every sound starts with a tone, sits on the poll's grid and fits a second
+	for (uint8_t i = 0; i < ROGER_COUNT; i++) {
+		const roger_step_t *st;
+		uint8_t n = roger_steps(i, &st);
+		uint32_t len = 0;
+		CHECK(n >= 1 && n <= ROGER_STEPS_MAX && st[0].hz != 0);
+		for (uint8_t k = 0; k < n; k++) {
+			CHECK(st[k].ms != 0 && st[k].ms % RADIO_POLL_MS == 0);
+			len += st[k].ms;
+		}
+		CHECK(len == roger_length_ms(i) && len <= 1000u && roger_step_at(i, len) == -1 && roger_step_at(i, 0) == 0);
+	}
+	const roger_step_t *c, *x;
+	CHECK(roger_steps(ROGER_COUNT + 5u, &x) == roger_steps(ROGER_CLASSIC, &c) && x == c &&
+	      c[0].hz == RADIO_ROGER_HZ1 && c[1].hz == RADIO_ROGER_HZ2);
+	// The generator: the sound's length in samples, a tone where it plays, silence in a pause and after
+	roger_gen_t g;
+	int16_t blk[160];
+	unsigned blocks = 0, loud = 0;
+	roger_gen_start(&g, ROGER_MORSE_K);
+	while (roger_gen_block(&g, blk, 160) && blocks < 100) {
+		int peak = 0;
+		for (int k = 0; k < 160; k++) {
+			int a = blk[k] < 0 ? -blk[k] : blk[k];
+			peak = a > peak ? a : peak;
+		}
+		loud += peak > 4000;
+		blocks++;
+	}
+	CHECK(blocks == 450 / 20 && loud >= 12 && loud < blocks);	// 22 full blocks; the gaps are quiet
+	CHECK(!roger_gen_block(&g, blk, 160) && blk[0] == 0 && blk[159] == 0);
+	settings(set_roger_none);
+}
+
 static void test_roger_burst(void)
 {
 	start();
@@ -3593,6 +3660,7 @@ int main(void)
 	test_bcl_inhibit();
 	test_tx_limit();
 	test_roger_burst();
+	test_roger_sounds();
 	test_burst_key();
 	test_channel_burst();
 	test_burst_deadlines();

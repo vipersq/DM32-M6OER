@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "board.h"
+#include "radio/roger_sound.h"
 #include "radio/radio_sm.h"
 #if CONFIG_APRS
 #include "aprs/aprs_beacon.h"	// APRS_WHY_*
@@ -143,7 +144,17 @@ static const hal_audio_t fake_audio = { .start = a_start, .stop = a_stop, .speak
 static bool codec_present;
 static bool v_present(void) { return codec_present; }
 static void v_reset(void) {}
-static void v_encode(const int16_t *pcm, uint8_t *bits) { (void)pcm; memset(bits, 0, VOCODER_BITS); }
+static int enc_loud;	// blocks the encoder got with a peak over 4000 (the roger sound; the test mic is silent)
+static void v_encode(const int16_t *pcm, uint8_t *bits)
+{
+	int peak = 0;
+	for (int i = 0; i < VOCODER_FRAME_SAMPLES; i++) {
+		int a = pcm[i] < 0 ? -pcm[i] : pcm[i];
+		peak = a > peak ? a : peak;
+	}
+	enc_loud += peak > 4000;
+	memset(bits, 0, VOCODER_BITS);
+}
 static void v_decode(const uint8_t *bits, int16_t *pcm) { (void)bits; memset(pcm, 0, VOCODER_FRAME_SAMPLES * 2); }
 static uint32_t v_options(void) { return VOCODER_OPT_NOISE_REDUCTION | VOCODER_OPT_TONE_FRAMES | VOCODER_OPT_AGC; }
 static void v_set_options(uint32_t opts) { (void)opts; }
@@ -1407,6 +1418,52 @@ static void test_dmr_stalled(void)
 	CHECK(sm.view.state == RS_IDLE && hw.tx_off_calls == 2);
 	sim.stalled = false;
 	aud.feed = false;
+}
+
+// The roger sound in DMR (radio/roger_sound.h): on PTT release the encoder gets the sound in place of the mic and the
+// stack keeps the transmission until it is out, then ends it as usual; PTT again during it carries on with no tone
+static void test_dmr_roger(void)
+{
+	radio_settings_t rs;
+	dmr_start(true);
+	aud.feed = true;
+	radio_get_settings(&rs);
+	rs.roger_beep = true;
+	rs.roger_sound = ROGER_QUINDAR;	// 250 ms
+	radio_set_settings(&rs);
+	run(20);
+	req(RREQ_PTT, 1);
+	run(600);
+	CHECK(sm.view.state == RS_TX && enc_loud == 0);
+	unsigned offs = hw.tx_off_calls;
+	req(RREQ_PTT, 0);
+	CHECK(sm.view.state == RS_TX && sm.view.roger && sm.dig_roger && hw.tx_off_calls == (int)offs);
+	run(240);
+	CHECK(sm.view.state == RS_TX && sm.view.roger && enc_loud >= 10);	// still sending the tone
+	for (int i = 0; i < 200 && sm.view.state == RS_TX; i++) {
+		run(10);
+	}
+	CHECK(sm.view.state == RS_IDLE && !sm.view.roger && !sm.dig_roger && hw.tx_off_calls == (int)offs + 1);
+	CHECK(enc_loud >= 12 && enc_loud <= 14 && sim.air[sim.air_count - 1].kind == DMR_BURST_TERMINATOR_LC);
+	// PTT again during the sound: the over goes on, the tone stops
+	enc_loud = 0;
+	req(RREQ_PTT, 1);
+	run(600);
+	req(RREQ_PTT, 0);
+	run(60);
+	req(RREQ_PTT, 1);
+	CHECK(sm.view.state == RS_TX && !sm.view.roger && !sm.dig_roger && !ambeVoiceTxToneBusy());
+	int loud = enc_loud;
+	run(300);
+	CHECK(sm.view.state == RS_TX && enc_loud <= loud + 1);
+	radio_get_settings(&rs);
+	rs.roger_beep = false;
+	radio_set_settings(&rs);
+	req(RREQ_PTT, 0);
+	run(1000);
+	CHECK(sm.view.state == RS_IDLE && !sm.view.roger);
+	aud.feed = false;
+	enc_loud = 0;
 }
 
 // A channel with no TX contact talks to the first talkgroup of its RX group list (issue #4: qdmr's open-firmware
@@ -4959,7 +5016,7 @@ static void test_factory_reset(void)
 	CHECK(settings_flush());
 	n_ev = 0;
 	CHECK(ui_svc_factory_reset());
-	sim_flash_cut_after(456);	// the settings records (page 1: 196 + 4 bytes, page 0: 252 + 4) go in, the native erase fails
+	sim_flash_cut_after(460);	// the settings records (page 1: 200 + 4 bytes, page 0: 252 + 4) go in, the native erase fails
 	storage_job_poll();
 	sim_flash_power_on();
 	CHECK(n_ev == 1 && strstr(last_ev.text, "native") != NULL);
@@ -5448,6 +5505,7 @@ int main(void)
 	test_dmr_rssi_hold();
 	test_fm_rssi_raw();
 	test_dmr_tx();
+	test_dmr_roger();
 	test_dmr_tx_end();
 	test_dmr_stalled();
 	test_dmr_list_talk_target();

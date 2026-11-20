@@ -95,6 +95,12 @@ void ambeVoiceSetRxPrimeWait(uint16_t ms);
 // (the HIL audio smoke test). Any task
 void ambeVoiceSetTestSignal(bool on);
 bool ambeVoiceTestSignal(void);
+// A roger sound (radio/roger_sound.h roger_sound_t) in place of the mic, DMR and C4FM: the encoder plays it from its
+// next block, then goes back to the mic. Busy from the call until the sound's last block is encoded; cancel stops it.
+// Any task
+void ambeVoiceTxTone(uint8_t sound);
+void ambeVoiceTxToneCancel(void);
+bool ambeVoiceTxToneBusy(void);
 // Encode options for DMR transmissions (VOCODER_OPT_*, default VOCODER_OPT_DEFAULT; Settings > Talk & listen > Mic
 // noise reduction). Handed to the vocoder in the audio callback before the next frame it encodes. Any task
 void ambeVoiceSetEncodeOptions(uint32_t opts);

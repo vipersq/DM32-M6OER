@@ -194,7 +194,7 @@ The menus in the C4FM build (`core/ui/ui_menus.c`, `ui_modes.c`):
 |---|---|
 | Switch to VFO / Memory | toggles, back to Home |
 | Zones, Channels | as in RadioFoundry |
-| FM | default squelch, busy lockout, roger beep; the channel or VFO in use (FM only): 25 kHz, RX / TX tone (CTCSS / DCS), the VFO's repeater offset |
+| FM | default squelch, busy lockout, roger sound; the channel or VFO in use (FM only): 25 kHz, RX / TX tone (CTCSS / DCS), the VFO's repeater offset |
 | DMR | last caller, contacts, messages, recent, DMR ID and name, reply window, monitor, talker alias, talk permit tone, Data and messages (radio checks, call alerts, SMS format) |
 | C4FM | Wires-X (5.1), Last heard (latest 10: callsign, radio ID, DG-ID, age), DG-ID, Callsign, Advanced (TX deviation 70-130 %, preamble 100-500 ms, Send as FT-70D, test tone) |
 | Tools | as in RadioFoundry |
@@ -267,3 +267,19 @@ CHIP_REG (`rfoundry_debug.py reg CHIP REG [VALUE] --page PAGE`), boards that bui
 3. Whether mic PCM and the vocoder keep their timing in the physical layer mode (the split duplex TX half fed its
    voice from the host).
 4. C4FM receivers' lock on our header after 100 ms of preamble (Yaesu radios key with a longer one).
+
+## Roger sounds (all modes)
+
+`core/radio/roger_sound.c` (MIT): one table of end-of-transmission sounds, chosen in the Roger sound row of the FM, DMR
+and C4FM pages (one setting: `radio_settings_t.roger_beep` on/off and `roger_sound`, stored in `settings_t.roger_sound`).
+Off, Classic (1200 / 900 Hz, the original), Beep, Double beep, Two-tone up / down, Triple chirp, Sweep up / down,
+Bee-boo, Morse K, Morse R, Quindar. Steps are on the radio core's 25 ms poll grid.
+
+| Mode | How it is sent |
+|---|---|
+| FM | tones on the carrier through `hal_radio_t.tx_tone`, one step per poll (`roger_poll`), then the unkey |
+| DMR, C4FM | on PTT release the AMBE+2 encoder takes the sound in place of the mic (`ambeVoiceTxTone`); the stack keeps PTT down until the encoder has played it and `RADIO_DIG_ROGER_GUARD_MS` (200 ms) of queued frames have gone out (`dig_roger_poll`), then releases as usual (DMR: terminator after the superframe; C4FM: terminator frame). PTT again during it cancels the sound and the over goes on |
+
+Host tests: radioFeaturesTest `test_roger_sounds` (FM steps, the table, the generator), radioCoreTest
+`test_dmr_roger` (DMR through the encoder). C4FM shares the encoder path; it has no radio core host test.
+

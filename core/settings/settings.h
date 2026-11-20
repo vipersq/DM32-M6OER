@@ -241,6 +241,9 @@ typedef struct {
 	// The C4FM callsign (Settings via C4FM > Callsign), upper case, NUL padded; "" = the radio name's first word
 	char c4fm_call[12];
 	uint32_t wx_room;		// Wires-X: the last room ID entered (Menu > C4FM > Wires-X), 0 = none
+	// The roger sound (radio/roger_sound.h roger_sound_t; appended: an older record reads 0, the classic tone pair)
+	uint8_t roger_sound;
+	uint8_t reserved_rs[3];		// 0
 } settings_t;
 
 // Pages: settings_t is stored as records of SETTINGS_PAGE_BYTES each (settings-store.md 2.1). Only the pages its size

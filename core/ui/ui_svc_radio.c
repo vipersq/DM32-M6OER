@@ -69,7 +69,7 @@ static void rs_send(const radio_settings_t *was)
 int32_t ui_svc_fm_get(uint8_t id)
 {
 	const radio_settings_t *s = rs_copy();
-	return id == UI_SET_FM_BCL ? s->bcl : s->roger_beep;
+	return id == UI_SET_FM_BCL ? s->bcl : s->roger_beep ? (int32_t)s->roger_sound + 1 : 0;
 }
 
 void ui_svc_fm_set(uint8_t id, int32_t value)
@@ -79,7 +79,10 @@ void ui_svc_fm_set(uint8_t id, int32_t value)
 		rs.bcl = (uint8_t)(value < RADIO_BCL_OFF ? RADIO_BCL_OFF : value > RADIO_BCL_WRONG_TONE ? RADIO_BCL_WRONG_TONE
 				   : value);
 	} else {
-		rs.roger_beep = value != 0;
+		rs.roger_beep = value > 0;	// 0 off, n: roger sound n - 1 (ui_menus.c v_roger)
+		if (value > 0 && value <= 255) {
+			rs.roger_sound = (uint8_t)(value - 1);
+		}
 	}
 	rs_send(&was);
 }

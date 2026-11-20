@@ -98,6 +98,7 @@
 #define RADIO_ROGER_HZ1		1200
 #define RADIO_ROGER_HZ2		900
 #define RADIO_ROGER_STEP_MS	100	// each of the two roger tones
+#define RADIO_DIG_ROGER_GUARD_MS	200	// DMR / C4FM: after the encoder has the sound, its frames still queued go out
 // The DCS turn-off tail after PTT release (hal_radio_t.tx_tail; radio-features.md)
 #define RADIO_SUBTONE_TAIL_MS	300
 
@@ -330,6 +331,13 @@ typedef struct {
 	bool burst_keyed;		// the 1750 Hz burst keyed the transmitter (not PTT)
 	uint32_t burst_end_ms;		// the burst ends by itself at this time (RREQ_TONE_BURST arg2), 0 = no limit
 	uint32_t roger_ms;		// roger beep start, 0 = none
+	uint8_t roger_snd;		// the sound playing (roger_sound_t)
+	int8_t roger_step;		// its step on the carrier now
+#endif
+#if CONFIG_DMR
+	bool dig_roger;			// DMR / C4FM: the roger sound is in the encoder; the stack still has PTT down
+	uint32_t dig_roger_ms;		// when it started
+	uint32_t dig_roger_done_ms;	// when the encoder finished it, 0 = still playing
 #endif
 #if CONFIG_DTMF
 	bool dtmf_held;			// the key of the digit sounding (view.dtmf) is still down

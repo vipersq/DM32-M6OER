@@ -6,6 +6,7 @@
 // No RTOS here: radio_task.c serializes the calls, and the host tests drive it directly.
 #include <string.h>
 #include "board.h"
+#include "radio/roger_sound.h"
 #include "radio/radio_sm.h"
 #include "radio/tones.h"
 #include "settings/settings.h"
@@ -4160,18 +4161,31 @@ static bool tx_tone(uint16_t hz)
 	return board.radio->tx_tone != NULL && board.radio->tx_tone(hz);
 }
 
-// The roger beep's second tone, then its end (every poll while it runs)
+// The roger sound's steps on the carrier, then its end (every poll while it runs; the steps are on the poll's grid)
 static void roger_poll(radio_sm_t *sm, uint32_t now_ms)
 {
-	uint32_t t = now_ms - sm->roger_ms;
-	if (t >= 2u * RADIO_ROGER_STEP_MS) {
+	int i = roger_step_at(sm->roger_snd, now_ms - sm->roger_ms);
+	if (i < 0) {
 		tx_tone(0);
 		sm->roger_ms = 0;
 		sm->view.roger = false;
 		fm_unkey(sm, false, now_ms);
-	} else if (t >= RADIO_ROGER_STEP_MS && t < RADIO_ROGER_STEP_MS + RADIO_POLL_MS) {
-		tx_tone(RADIO_ROGER_HZ2);
+	} else if (i != sm->roger_step) {
+		const roger_step_t *st;
+		(void)roger_steps(sm->roger_snd, &st);
+		sm->roger_step = (int8_t)i;
+		tx_tone(st[i].hz);
 	}
+}
+
+// The first step of the roger sound on the carrier; false when the board can't send tones
+static bool roger_start(radio_sm_t *sm)
+{
+	const roger_step_t *st;
+	sm->roger_snd = sm->set.roger_sound < ROGER_COUNT ? sm->set.roger_sound : ROGER_CLASSIC;
+	(void)roger_steps(sm->roger_snd, &st);
+	sm->roger_step = 0;
+	return tx_tone(st[0].hz);	// every sound starts with a tone
 }
 
 static void roger_cancel(radio_sm_t *sm)
@@ -4185,6 +4199,43 @@ static void roger_cancel(radio_sm_t *sm)
 }
 #endif
 
+#if CONFIG_C4FM
+#define DIG_C4FM(sm)	((sm)->c4fm_running)
+#else
+#define DIG_C4FM(sm)	false
+#endif
+
+#if CONFIG_DMR
+static void dig_roger_stop(radio_sm_t *sm)
+{
+	ambeVoiceTxToneCancel();
+	sm->dig_roger = false;
+	sm->view.roger = false;
+	changed(sm);
+}
+
+static void ptt_release(radio_sm_t *sm, bool roger, uint32_t now_ms);
+
+// DMR / C4FM: wait for the encoder to finish the roger sound and its frames to go out, then release as usual. A
+// transmission the stack ended meanwhile (the time-out) just drops it; a sound that never finishes is cut
+static void dig_roger_poll(radio_sm_t *sm, uint32_t now_ms)
+{
+	if (sm->view.state != RS_TX) {
+		dig_roger_stop(sm);
+		return;
+	}
+	if (sm->dig_roger_done_ms == 0 && !ambeVoiceTxToneBusy()) {
+		sm->dig_roger_done_ms = now_ms != 0 ? now_ms : 1;
+	}
+	bool out = sm->dig_roger_done_ms != 0 && now_ms - sm->dig_roger_done_ms >= RADIO_DIG_ROGER_GUARD_MS;
+	if (out || now_ms - sm->dig_roger_ms >= roger_length_ms(sm->set.roger_sound) + 1000u) {
+		dig_roger_stop(sm);
+		sm->ptt = true;		// the release the stack hasn't had yet
+		ptt_release(sm, false, now_ms);
+	}
+}
+#endif
+
 static void ptt_down(radio_sm_t *sm, uint32_t now_ms)
 {
 	if (sm->ptt) {
@@ -4193,6 +4244,13 @@ static void ptt_down(radio_sm_t *sm, uint32_t now_ms)
 	aprs_rf_abort(sm, now_ms);	// back on the channel first: PTT talks there
 	activity(sm, now_ms);
 	roam_cancel(sm, now_ms);	// PTT transmits on the site the user saw before a roaming search
+#if CONFIG_DMR
+	if (sm->dig_roger) {
+		dig_roger_stop(sm);	// pressed again during the roger sound: the transmission goes on (the stack never
+		sm->ptt = true;		// saw the release)
+		return;
+	}
+#endif
 #if CONFIG_FM_TX_TONES
 	if (sm->roger_ms != 0 && sm->view.state == RS_TX) {
 		roger_cancel(sm);	// pressed again during the roger beep: the transmission goes on
@@ -4297,6 +4355,20 @@ static void ptt_release(radio_sm_t *sm, bool roger, uint32_t now_ms)
 	if (sm->host_audio) {
 		roger = false;		// the host sends its own audio, tones included
 	}
+#if CONFIG_DMR
+	// DMR and C4FM: the roger sound goes through the encoder in place of the mic, the stack keeps PTT down until it
+	// is out (dig_roger_poll), then the release below runs as usual
+	if (roger && sm->set.roger_beep && sm->view.state == RS_TX &&
+	    (sm->dmr_running || DIG_C4FM(sm))) {
+		ambeVoiceTxTone(sm->set.roger_sound < ROGER_COUNT ? sm->set.roger_sound : ROGER_CLASSIC);
+		sm->dig_roger = true;
+		sm->dig_roger_ms = now_ms;
+		sm->dig_roger_done_ms = 0;
+		sm->view.roger = true;
+		changed(sm);
+		return;
+	}
+#endif
 #if CONFIG_C4FM
 	if (sm->c4fm_running) {
 		c4fm_call_ptt(false);
@@ -4334,7 +4406,7 @@ static void ptt_release(radio_sm_t *sm, bool roger, uint32_t now_ms)
 	}
 	sm->burst_keyed = false;
 	if (roger && !keyed && sm->set.roger_beep && sm->view.state == RS_TX && sm->view.ch.mode == RADIO_MODE_FM &&
-			tx_tone(RADIO_ROGER_HZ1)) {
+			roger_start(sm)) {
 		sm->roger_ms = now_ms != 0 ? now_ms : 1;
 		sm->view.roger = true;
 		changed(sm);
@@ -5037,6 +5109,7 @@ static void settings_to_radio(const settings_t *st, radio_settings_t *s)
 	s->tot_warn_s = st->rs_tot_warn_s;
 	s->bcl = st->rs_bcl;
 	s->roger_beep = (st->rs_flags & SETTINGS_RS_ROGER_BEEP) != 0;
+	s->roger_sound = st->roger_sound < ROGER_COUNT ? st->roger_sound : 0;
 	s->tx_inhibit = (st->rs_flags & SETTINGS_RS_TX_INHIBIT) != 0;
 	s->scan_priority = (st->rs_flags & SETTINGS_RS_SCAN_PRIORITY) != 0;
 	s->scan_beep = (st->rs_flags & SETTINGS_RS_SCAN_BEEP) != 0;
@@ -5065,6 +5138,7 @@ static void radio_to_settings(const radio_settings_t *s, uint32_t now_ms)
 	st->rs_tot_s = s->tot_s;
 	st->rs_tot_warn_s = s->tot_warn_s;
 	st->rs_bcl = s->bcl;
+	st->roger_sound = s->roger_sound;
 	st->rs_flags = (uint8_t)((s->roger_beep ? SETTINGS_RS_ROGER_BEEP : 0) | (s->tx_inhibit ? SETTINGS_RS_TX_INHIBIT : 0) |
 				 (s->scan_priority ? SETTINGS_RS_SCAN_PRIORITY : 0) |
 				 (s->scan_beep ? SETTINGS_RS_SCAN_BEEP : 0) | (s->key_beep ? SETTINGS_RS_KEY_BEEP : 0) |
@@ -6485,6 +6559,11 @@ void radio_sm_poll(radio_sm_t *sm, uint32_t now_ms)
 	}
 #if CONFIG_DMR_ROAMING
 	roam_service(sm, &st, now_ms);
+#endif
+#if CONFIG_DMR
+	if (sm->dig_roger) {
+		dig_roger_poll(sm, now_ms);
+	}
 #endif
 	if (sm->dmr_running) {
 		return;		// the state follows the call stack (radio_sm_tick), and the stack keeps its own TX time-out

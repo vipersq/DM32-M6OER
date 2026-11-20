@@ -3,6 +3,7 @@
 // DMR voice glue: call stack frames <-> FEC <-> vocoder <-> PCM blocks (ambeVoice.h)
 #include "dmr/ambe/ambeVoice.h"
 #include "dmr/ambe/ambeFec.h"
+#include "radio/roger_sound.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -60,6 +61,11 @@ static bool cb_mixing;
 static uint16_t rx_gain_q8 = 256;	// ambeVoiceSetRxGain: the decoded voice times this / 256
 static uint16_t mic_gain_q8 = 256;	// ambeVoiceSetMicGain: the mic samples times this / 256 before encoding
 static bool test_signal;		// ambeVoiceSetTestSignal
+// The roger sound in place of the mic (ambeVoiceTxTone): tone_req = sound + 1 asked for, 0xFF cancel; tone_busy while
+// the callback plays it. The generator is the audio callback's only
+static uint8_t tone_req;
+static bool tone_busy;
+static roger_gen_t tone_gen;
 static uint16_t test_phase;		// the test signal's phase (a full cycle is 65536) and its pitch step
 static uint8_t test_blocks;
 static uint8_t tx_prev[VOCODER_BITS];	// the transmission's previous frame (tx_repeats)
@@ -416,12 +422,29 @@ static void tx_block(const int16_t *mic)
 	}
 	uint8_t bits[VOCODER_BITS];
 	static int16_t scaled[AUDIO_BLOCK_SAMPLES];	// the audio callback only (off its stack)
-	if (LOAD(test_signal)) {
+	bool tone = false;
+	uint8_t req = LOAD(tone_req);
+	if (req != 0) {
+		STORE(tone_req, (uint8_t)0);
+		if (req == 0xFF) {
+			tone_gen.on = false;
+		} else {
+			roger_gen_start(&tone_gen, (uint8_t)(req - 1u));
+		}
+	}
+	if (tone_gen.on) {
+		STORE(tone_busy, roger_gen_block(&tone_gen, scaled, AUDIO_BLOCK_SAMPLES));
+		mic = scaled;
+		tone = true;
+	} else if (LOAD(tone_busy) && LOAD(tone_req) == 0) {	// not a request that came after the read above
+		STORE(tone_busy, false);
+	}
+	if (!tone && LOAD(test_signal)) {
 		test_block(scaled);
 		mic = scaled;
 	}
 	uint16_t g = LOAD(mic_gain_q8);
-	if (g != 256) {
+	if (g != 256 && !tone) {
 		for (int i = 0; i < AUDIO_BLOCK_SAMPLES; i++) {
 			int32_t v = ((int32_t)mic[i] * g) / 256;
 			scaled[i] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
@@ -566,6 +589,23 @@ void ambeVoiceSetTestSignal(bool on)
 bool ambeVoiceTestSignal(void)
 {
 	return LOAD(test_signal);
+}
+
+void ambeVoiceTxTone(uint8_t sound)
+{
+	STORE(tone_busy, true);	// busy from the request: the radio core waits for the callback to take it
+	STORE(tone_req, (uint8_t)(sound + 1u));
+}
+
+void ambeVoiceTxToneCancel(void)
+{
+	STORE(tone_req, (uint8_t)0xFF);
+	STORE(tone_busy, false);
+}
+
+bool ambeVoiceTxToneBusy(void)
+{
+	return LOAD(tone_busy);
 }
 
 void ambeVoiceResetStats(void)

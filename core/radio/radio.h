@@ -43,7 +43,8 @@ typedef struct {
 	uint16_t tot_s;		// the radio's TX time-out, for channels whose own is 0; 0 = none
 	uint8_t tot_warn_s;	// warning beep this long before the time-out, 0 = none
 	uint8_t bcl;		// radio_bcl_t
-	bool roger_beep;	// FM: a short tone pair at the end of each transmission (CONFIG_FM_TX_TONES)
+	bool roger_beep;	// a roger sound at the end of each transmission: FM (CONFIG_FM_TX_TONES), DMR and C4FM
+	uint8_t roger_sound;	// which (radio/roger_sound.h roger_sound_t)
 	bool tx_inhibit;	// refuse every transmission
 	// Scan (CONFIG_SCAN)
 	uint8_t scan_resume;	// scan_resume_t (radio/scan.h): 0 time, 1 carrier, 2 stop
