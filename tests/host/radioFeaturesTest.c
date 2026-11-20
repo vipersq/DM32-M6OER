@@ -2605,6 +2605,9 @@ static void set_tac_all(radio_settings_t *s) { s->tac_key = s->tac_unkey = s->ta
 static void set_tac_none(radio_settings_t *s) { s->tac_key = s->tac_unkey = s->tac_rx = false; }
 static void set_leds_off(radio_settings_t *s) { s->leds_off = true; }
 static void set_leds_on(radio_settings_t *s) { s->leds_off = false; }
+static void set_tac_style_deep(radio_settings_t *s) { s->tac_style = 0; }
+static void set_tac_style_bloop(radio_settings_t *s) { s->tac_style = 1; }
+static void set_tac_style_high(radio_settings_t *s) { s->tac_style = 3; }
 
 static uint32_t beeps_tried(void)
 {
@@ -2665,6 +2668,20 @@ static void test_tactical_tones(void)
 	CHECK(sm.view.state == RS_TX && hw.led[LED_RED]);
 	req(RREQ_PTT, 0);
 	run(300);
+	// The style: deep by default (low pitches), a change plays the key-up tone in the new one at once, each style its
+	// own sound
+	const beep_seg_t *deep, *seg;
+	CHECK(beep_pattern(BEEP_TAC_KEY, &deep) >= 1 && deep[0].hz <= 900);
+	uint32_t b1 = beeps_tried();
+	settings(set_tac_style_bloop);
+	run(50);
+	CHECK(beeps_tried() == b1 + 1 && beep_pattern(BEEP_TAC_KEY, &seg) >= 1 && seg != deep);
+	settings(set_tac_style_high);
+	run(50);
+	CHECK(beeps_tried() == b1 + 2 && beep_pattern(BEEP_TAC_UNKEY, &seg) >= 1 && seg[0].hz >= 2000);
+	settings(set_tac_style_deep);
+	run(50);
+	CHECK(beep_pattern(BEEP_TAC_KEY, &seg) >= 1 && seg == deep);
 }
 
 static void test_roger_burst(void)

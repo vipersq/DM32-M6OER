@@ -6001,6 +6001,9 @@ static const set_item_t s_advanced[] = {
 static const int16_t v_tac_bright[] = { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
 static const char *const n_tac_bright[] = { TRN("Normal"), "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%",
 	"90%", "100%" };
+// The tactical tones' styles (beep.h BEEP_TAC_STYLES): a change plays the key-up tone in the new one
+static const int16_t v_tac_style[] = { 0, 1, 2, 3 };
+static const char *const n_tac_style[] = { TRN("Deep"), TRN("Bloop"), TRN("Low chirp"), TRN("High chirp") };
 static const set_item_t s_tactical[] = {
 	TOGGLE(TRN("Tactical mode"), "red screen night vision military", UI_SET_TAC_MODE),
 	LIST(TRN("Red brightness"), "tactical backlight night", UI_SET_TAC_BRIGHT, v_tac_bright, n_tac_bright),
@@ -6008,6 +6011,7 @@ static const set_item_t s_tactical[] = {
 	TOGGLE(TRN("Key-up tone"), "tactical military PTT press chirp", UI_SET_TAC_KEY),
 	TOGGLE(TRN("Unkey tone"), "tactical military PTT release chirp", UI_SET_TAC_UNKEY),
 	TOGGLE(TRN("RX tone"), "tactical military receive start blip", UI_SET_TAC_RX),
+	LIST(TRN("Tone style"), "tactical sound deep bloop chirp", UI_SET_TAC_STYLE, v_tac_style, n_tac_style),
 };
 #endif
 

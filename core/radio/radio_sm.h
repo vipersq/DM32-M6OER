@@ -339,6 +339,7 @@ typedef struct {
 	bool tac_pass;			// ptt_down called from the hold: no second tone
 	uint32_t tac_hold_ms;
 	bool tac_prev_tx, tac_prev_rx;
+	uint8_t tac_style_was;		// the style last given to the beeps (0xFF: none yet); a change plays a preview
 #if CONFIG_DMR
 	bool dig_roger;			// DMR / C4FM: the roger sound is in the encoder; the stack still has PTT down
 	uint32_t dig_roger_ms;		// when it started

@@ -5132,6 +5132,7 @@ static void settings_to_radio(const settings_t *st, radio_settings_t *s)
 	s->tac_unkey = (st->tac_flags & SETTINGS_TAC_UNKEY) != 0;
 	s->tac_rx = (st->tac_flags & SETTINGS_TAC_RX) != 0;
 	s->leds_off = (st->tac_flags & SETTINGS_TAC_LEDS_OFF) != 0;
+	s->tac_style = (uint8_t)((st->tac_flags & SETTINGS_TAC_STYLE_MASK) >> SETTINGS_TAC_STYLE_SHIFT);
 	s->tx_inhibit = (st->rs_flags & SETTINGS_RS_TX_INHIBIT) != 0;
 	s->scan_priority = (st->rs_flags & SETTINGS_RS_SCAN_PRIORITY) != 0;
 	s->scan_beep = (st->rs_flags & SETTINGS_RS_SCAN_BEEP) != 0;
@@ -5162,7 +5163,8 @@ static void radio_to_settings(const radio_settings_t *s, uint32_t now_ms)
 	st->rs_bcl = s->bcl;
 	st->roger_sound = s->roger_sound;
 	st->tac_flags = (uint8_t)((s->tac_key ? SETTINGS_TAC_KEY : 0) | (s->tac_unkey ? SETTINGS_TAC_UNKEY : 0) |
-				  (s->tac_rx ? SETTINGS_TAC_RX : 0) | (s->leds_off ? SETTINGS_TAC_LEDS_OFF : 0));
+				  (s->tac_rx ? SETTINGS_TAC_RX : 0) | (s->leds_off ? SETTINGS_TAC_LEDS_OFF : 0) |
+				  ((s->tac_style << SETTINGS_TAC_STYLE_SHIFT) & SETTINGS_TAC_STYLE_MASK));
 	st->rs_flags = (uint8_t)((s->roger_beep ? SETTINGS_RS_ROGER_BEEP : 0) | (s->tx_inhibit ? SETTINGS_RS_TX_INHIBIT : 0) |
 				 (s->scan_priority ? SETTINGS_RS_SCAN_PRIORITY : 0) |
 				 (s->scan_beep ? SETTINGS_RS_SCAN_BEEP : 0) | (s->key_beep ? SETTINGS_RS_KEY_BEEP : 0) |
@@ -5392,6 +5394,7 @@ void radio_sm_init(radio_sm_t *sm, uint32_t now_ms)
 #endif
 
 	memset(sm, 0, sizeof(*sm));
+	sm->tac_style_was = 0xFFu;	// the first poll gives the beeps the stored style, with no preview
 	sm->audio_out = -1;
 	sm->green_out = -1;
 #if CONFIG_BCAST_FM
@@ -6454,6 +6457,14 @@ static int16_t rssi_held(radio_sm_t *sm, int16_t rssi_dbm)
 static void tac_service(radio_sm_t *sm, uint32_t now_ms)
 {
 #if CONFIG_BEEP
+	if (sm->set.tac_style != sm->tac_style_was) {
+		bool preview = sm->tac_style_was != 0xFFu;	// not at start-up: a style picked in the menu is heard at once
+		sm->tac_style_was = sm->set.tac_style;
+		beep_tac_style(sm->set.tac_style);
+		if (preview && sm->view.state != RS_TX) {
+			beep(sm, BEEP_TAC_KEY);
+		}
+	}
 	if (sm->tac_hold) {
 		const beep_seg_t *segs;
 		uint32_t len = 0, t = now_ms - sm->tac_hold_ms;

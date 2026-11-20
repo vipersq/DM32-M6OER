@@ -47,6 +47,7 @@ int32_t ui_modes_setting_get(uint8_t id)
 	case UI_SET_TAC_UNKEY:
 	case UI_SET_TAC_RX:
 	case UI_SET_TAC_LEDS:
+	case UI_SET_TAC_STYLE:
 		return ui_svc_fm_get(id);
 	case UI_SET_CH_WIDE:
 		return v->ch.bw == RADIO_BW_25K;
@@ -71,6 +72,7 @@ bool ui_modes_setting_set(uint8_t id, int32_t value)
 	case UI_SET_TAC_UNKEY:
 	case UI_SET_TAC_RX:
 	case UI_SET_TAC_LEDS:
+	case UI_SET_TAC_STYLE:
 		ui_svc_fm_set(id, value);
 		return true;
 	case UI_SET_CH_WIDE:

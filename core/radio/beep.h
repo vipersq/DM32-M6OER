@@ -59,6 +59,9 @@ typedef struct {
 } beep_stats_t;
 
 #define BEEP_SEGS_MAX	6
+// Tactical tone styles (beep_tac_style): 0 deep, 1 bloop, 2 low chirp, 3 high chirp
+#define BEEP_TAC_STYLES	4
+void beep_tac_style(uint8_t style);
 
 // audio NULL: beeps are counted as dropped
 void beep_init(const hal_audio_t *audio);

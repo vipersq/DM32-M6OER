@@ -49,6 +49,7 @@ typedef struct {
 	// it), the transmission ended, a reception started. Off by default
 	bool tac_key, tac_unkey, tac_rx;
 	bool leds_off;		// the TX / RX LEDs stay dark (Settings > Tactical)
+	uint8_t tac_style;	// the tactical tones' style (beep_tac_style)
 	bool tx_inhibit;	// refuse every transmission
 	// Scan (CONFIG_SCAN)
 	uint8_t scan_resume;	// scan_resume_t (radio/scan.h): 0 time, 1 carrier, 2 stop

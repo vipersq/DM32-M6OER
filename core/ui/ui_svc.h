@@ -370,6 +370,7 @@ typedef enum {
 	UI_SET_TAC_UNKEY,
 	UI_SET_TAC_RX,
 	UI_SET_TAC_LEDS,	// Settings > Tactical: the LEDs off (radio_settings_t.leds_off), 1 off, 0 as usual
+	UI_SET_TAC_STYLE,	// ... the tactical tones' style, 0..BEEP_TAC_STYLES - 1 (radio_settings_t.tac_style)
 	UI_SET_CH_WIDE,
 	UI_SET_CH_RX_TONE,
 	UI_SET_CH_TX_TONE,

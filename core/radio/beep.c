@@ -39,17 +39,27 @@ static const beep_seg_t p_message[] = { { 1000, 60 }, { 0, 30 }, { 1300, 60 }, {
 // The speaker test (tests/hil/test_speaker.py): silence with the route up (a pop or a click there is the route's, not
 // the sweep's), the sweep, a short tail
 static const beep_seg_t p_sweep[] = { { 0, 400 }, { BEEP_HZ_SWEEP, 4000 }, { 0, 200 } };
-// Tactical tones, in the style of a military handheld: a crisp rising chirp at key-up, a falling one at unkey, a soft
-// two-note blip when a reception starts. Short: key-up holds the transmitter until it has played
-static const beep_seg_t p_tac_key[] = { { 2000, 30 }, { 0, 15 }, { 2500, 45 } };
-static const beep_seg_t p_tac_unkey[] = { { 2500, 30 }, { 0, 15 }, { 1700, 55 } };
-static const beep_seg_t p_tac_rx[] = { { 1100, 35 }, { 1500, 45 } };
+// Tactical tones, in the style of a military handheld, in BEEP_TAC_STYLES sets (beep_tac_style): key-up, unkey, a
+// reception. Kept in 500-900 Hz but the high set: deep, and still above what a handheld's small speaker loses. Short:
+// key-up holds the transmitter until it has played
+static const beep_seg_t p_tac_key[] = { { 600, 40 }, { 900, 60 } };		// deep: a rising two-note
+static const beep_seg_t p_tac_unkey[] = { { 900, 50 }, { 600, 80 } };		// ... falling
+static const beep_seg_t p_tac_rx[] = { { 500, 60 } };
+static const beep_seg_t p_tac_key_b[] = { { 750, 30 }, { 0, 10 }, { 750, 70 } };	// bloop
+static const beep_seg_t p_tac_unkey_b[] = { { 520, 120 } };
+static const beep_seg_t p_tac_rx_b[] = { { 650, 40 }, { 0, 20 }, { 650, 40 } };
+static const beep_seg_t p_tac_key_c[] = { { 550, 25 }, { 650, 25 }, { 750, 25 }, { 850, 25 } };	// low chirp
+static const beep_seg_t p_tac_unkey_c[] = { { 850, 25 }, { 750, 25 }, { 650, 25 }, { 550, 25 } };
+static const beep_seg_t p_tac_rx_c[] = { { 600, 50 } };
+static const beep_seg_t p_tac_key_h[] = { { 2000, 30 }, { 0, 15 }, { 2500, 45 } };	// high chirp
+static const beep_seg_t p_tac_unkey_h[] = { { 2500, 30 }, { 0, 15 }, { 1700, 55 } };
+static const beep_seg_t p_tac_rx_h[] = { { 1100, 35 }, { 1500, 45 } };
 
 #define PAT(p)	{ p, sizeof(p) / sizeof(p[0]) }
 static const struct {
 	const beep_seg_t *segs;
 	uint8_t count;
-} patterns[BEEP_COUNT] = {
+} patterns[BEEP_COUNT + 3 * (BEEP_TAC_STYLES - 1)] = {
 	[BEEP_KEY] = PAT(p_key),
 	[BEEP_ERROR] = PAT(p_error),
 	[BEEP_TX_PERMIT] = PAT(p_permit),
@@ -66,7 +76,28 @@ static const struct {
 	[BEEP_TAC_KEY] = PAT(p_tac_key),
 	[BEEP_TAC_UNKEY] = PAT(p_tac_unkey),
 	[BEEP_TAC_RX] = PAT(p_tac_rx),
+	// The other styles' sets past the table's own entries, in event order (key-up, unkey, reception)
+	[BEEP_COUNT + 0] = PAT(p_tac_key_b), [BEEP_COUNT + 1] = PAT(p_tac_unkey_b), [BEEP_COUNT + 2] = PAT(p_tac_rx_b),
+	[BEEP_COUNT + 3] = PAT(p_tac_key_c), [BEEP_COUNT + 4] = PAT(p_tac_unkey_c), [BEEP_COUNT + 5] = PAT(p_tac_rx_c),
+	[BEEP_COUNT + 6] = PAT(p_tac_key_h), [BEEP_COUNT + 7] = PAT(p_tac_unkey_h), [BEEP_COUNT + 8] = PAT(p_tac_rx_h),
 };
+_Static_assert(BEEP_TAC_STYLES == 4, "a set past the table per style but the first");
+
+static volatile uint8_t tac_style;	// beep_tac_style
+
+void beep_tac_style(uint8_t style)
+{
+	tac_style = style < BEEP_TAC_STYLES ? style : 0;
+}
+
+// The table entry a beep plays: a tactical tone in the style chosen
+static uint8_t pattern_of(beep_t b)
+{
+	uint8_t st = tac_style;
+	if (b >= BEEP_TAC_KEY && b <= BEEP_TAC_RX && st != 0 && st < BEEP_TAC_STYLES)
+		return (uint8_t)(BEEP_COUNT + 3u * (st - 1u) + (b - BEEP_TAC_KEY));
+	return (uint8_t)b;
+}
 
 // One period of a sine, Q15
 static const int16_t sine[64] = {
@@ -156,8 +187,8 @@ uint8_t beep_pattern(beep_t b, const beep_seg_t **segs)
 		*segs = NULL;
 		return 0;
 	}
-	*segs = patterns[b].segs;
-	return patterns[b].count;
+	*segs = patterns[pattern_of(b)].segs;
+	return patterns[pattern_of(b)].count;
 }
 
 bool beep_busy(void)
@@ -174,7 +205,7 @@ void beep_play(beep_t b, uint8_t level, bool shared)
 		stats.no_stream++;
 		return;
 	}
-	req_pattern = (uint8_t)b;
+	req_pattern = pattern_of(b);
 	req_level = level > 100 ? 100 : level;
 	lead_target = lead_blocks();	// before the warm below: an amplifier only just powered still needs the lead
 	beep_warm(last_now);		// a beep is a sound: the amplifier stays up for the next one

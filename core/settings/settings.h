@@ -382,6 +382,8 @@ static inline void settings_set_crash_contact(settings_t *s, uint16_t num)
 #define SETTINGS_TAC_UNKEY		0x02u
 #define SETTINGS_TAC_RX			0x04u
 #define SETTINGS_TAC_LEDS_OFF		0x08u	// the TX / RX LEDs stay dark
+#define SETTINGS_TAC_STYLE_SHIFT	4	// bits 4-5: the tactical tones' style (beep.h BEEP_TAC_STYLES; 0 deep)
+#define SETTINGS_TAC_STYLE_MASK		0x30u
 // tac_ui
 #define SETTINGS_TACUI_RED		0x01u	// tactical mode: the screen in shades of red
 // settings_t.rpt_beacon (taken with the roam_ fields)
