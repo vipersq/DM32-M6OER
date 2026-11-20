@@ -45,6 +45,9 @@ typedef struct {
 	uint8_t bcl;		// radio_bcl_t
 	bool roger_beep;	// a roger sound at the end of each transmission: FM (CONFIG_FM_TX_TONES), DMR and C4FM
 	uint8_t roger_sound;	// which (radio/roger_sound.h roger_sound_t)
+	// Tactical tones on the speaker (Settings > Sound), each on its own, all modes: PTT pressed (the key-up waits for
+	// it), the transmission ended, a reception started. Off by default
+	bool tac_key, tac_unkey, tac_rx;
 	bool tx_inhibit;	// refuse every transmission
 	// Scan (CONFIG_SCAN)
 	uint8_t scan_resume;	// scan_resume_t (radio/scan.h): 0 time, 1 carrier, 2 stop

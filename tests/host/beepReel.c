@@ -106,6 +106,11 @@ static const step_t steps[] = {
 	{ NULL, "long:quick", NULL, false, false, 0 },
 	{ "Emergency heard", "emergency:3105678", "EMERGENCY", false, false, 0 },
 	{ NULL, "back", NULL, false, false, 500 },
+	// Tactical tones (Settings > Sound, off by default): radio_sm.c ptt_down (TAC_KEY) and tac_service
+	{ "Tactical tones: key-up, unkey, a reception", "pttdown", "TAC_KEY", false, false, 300 },
+	{ NULL, "pttup", "TAC_UNKEY", false, false, 300 },
+	{ NULL, "fmrx", "TAC_RX", false, false, 500 },
+	{ NULL, "fmrxend", NULL, false, true, 300 },
 };
 #define STEPS	((int)(sizeof steps / sizeof steps[0]))
 

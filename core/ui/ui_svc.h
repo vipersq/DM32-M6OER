@@ -365,6 +365,10 @@ typedef enum {
 	// repeater offset in kHz (0 simplex; the VFO only)
 	UI_SET_FM_BCL,
 	UI_SET_FM_ROGER,
+	// Tactical tones (Settings > Sound; radio_settings_t.tac_*): 1 on, 0 off
+	UI_SET_TAC_KEY,
+	UI_SET_TAC_UNKEY,
+	UI_SET_TAC_RX,
 	UI_SET_CH_WIDE,
 	UI_SET_CH_RX_TONE,
 	UI_SET_CH_TX_TONE,

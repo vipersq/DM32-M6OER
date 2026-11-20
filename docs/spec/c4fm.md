@@ -19,7 +19,7 @@ The C4FM fork's radio mode: DN voice (V/D mode 2) beside FM, on one frequency. P
 
 | Item | |
 |---|---|
-| Voice | DN only: AMBE+2 3600x2450, the frame DMR carries. VW (voice full rate, IMBE) and V/D mode 1 are shown, not played |
+| Voice | DN: AMBE+2 3600x2450, the frame DMR carries. VW (voice full rate, IMBE): received and played (section "VW"), not sent. V/D mode 1 is shown, not played |
 | Identity | A callsign: the radio name's first word (`radio_cwid_callsign`), and a five-character radio ID from the chip's unique ID (`c4fm_radio_id`). No contacts, no talk groups |
 | Selector | DG-ID 0-99 (Settings > My radio > C4FM DG-ID). 00 sends with DG-ID 0 and hears every transmission |
 | Channels | a codeplug channel's mode byte 2 is C4FM, its DG-ID (0-99) in the color code byte; the VFO uses the DG-ID setting |
@@ -282,4 +282,24 @@ Bee-boo, Morse K, Morse R, Quindar. Steps are on the radio core's 25 ms poll gri
 
 Host tests: radioFeaturesTest `test_roger_sounds` (FM steps, the table, the generator), radioCoreTest
 `test_dmr_roger` (DMR through the encoder). C4FM shares the encoder path; it has no radio core host test.
+
+## VW (voice full rate)
+
+`core/c4fm/ysf_vw.c`: a VW frame (FICH DT 3) carries the full-rate vocoder's 144-bit words at payload bytes 0, 18, 36,
+54 and 72, the same words as a P25 LDU's voice frames (four Golay(23,12), three Hamming(15,11), seven bits bare, PN
+masks from the first word); the first frame after the header (FN 0 of FT 1) has data in its first 45 bytes and voice in
+the last two words only. The bit map is RadioFoundry's P25 one (core/p25/p25_unit.c), checked bit for bit against the
+YSF layout. The words go through `c4fm_call_set_imbe` to `ambeVoiceImbeFrame`, which queues them with the DN frames;
+the audio callback decodes them with RadioFoundry's full-rate decoder (`core/mbe`, MIT, tables from mbelib under ISC),
+which repeats and then mutes on bad frames. RAM: about 3.4 KB (the decoder's state and scratch). Receive only.
+Host test: `c4fmVwTest`.
+
+## Tactical tones
+
+Settings > Sound: Tactical key-up tone, Tactical unkey tone, Tactical RX tone, each on its own, off by default
+(`radio_settings_t.tac_*`, `settings_t.tac_flags`). Short speaker sounds in the style of a military handheld, every mode
+(`beep.c` BEEP_TAC_*). The key-up tone plays before keying: `ptt_down` holds (`tac_hold`) and `tac_service` keys once
+the tone is over (or after its length + 100 ms if the stream never ran it); PTT let go meanwhile keys nothing. The unkey
+tone follows the end of a transmission (after the roger sound), the RX tone the squelch or a call opening. None on a
+no-beep channel. Host test: radioFeaturesTest `test_tactical_tones`.
 

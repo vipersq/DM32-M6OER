@@ -139,6 +139,9 @@ typedef struct {
 } c4fm_raw_t;
 
 void c4fm_call_init(const hal_c4fm_t *modem);
+// Where VW (voice full rate) frames go, one 88-bit full-rate frame and what its FEC corrected (core/mbe/imbe.h IMBE_ERRS)
+// at a time, in the call the voice sink has open; NULL: VW is shown, not played
+void c4fm_call_set_imbe(void (*out)(const uint8_t imbe[11], uint8_t errs));
 void c4fm_call_set_voice(const dmr_voice_sink_t *sink, const dmr_voice_source_t *source);
 void c4fm_call_configure(const c4fm_config_t *cfg);
 // On a C4FM channel, with the board's RF in C4FM receive: start receiving (false: no modem)

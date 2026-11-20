@@ -243,7 +243,8 @@ typedef struct {
 	uint32_t wx_room;		// Wires-X: the last room ID entered (Menu > C4FM > Wires-X), 0 = none
 	// The roger sound (radio/roger_sound.h roger_sound_t; appended: an older record reads 0, the classic tone pair)
 	uint8_t roger_sound;
-	uint8_t reserved_rs[3];		// 0
+	uint8_t tac_flags;		// SETTINGS_TAC_* (tactical tones; 0 = all off)
+	uint8_t reserved_rs[2];		// 0
 } settings_t;
 
 // Pages: settings_t is stored as records of SETTINGS_PAGE_BYTES each (settings-store.md 2.1). Only the pages its size
@@ -375,6 +376,10 @@ static inline void settings_set_crash_contact(settings_t *s, uint16_t num)
 #define SETTINGS_RS_SCAN_BEEP		0x08u
 #define SETTINGS_RS_KEY_BEEP		0x10u
 #define SETTINGS_RS_NO_TALK_PERMIT	0x20u	// the talk permit tone off (0 = on, as before)
+// tac_flags
+#define SETTINGS_TAC_KEY		0x01u
+#define SETTINGS_TAC_UNKEY		0x02u
+#define SETTINGS_TAC_RX			0x04u
 // settings_t.rpt_beacon (taken with the roam_ fields)
 #define SETTINGS_RPT_BEACON		0x01u	// our repeater roles key an idle beacon
 #define SETTINGS_RPT_SFR_RX		0x06u	// an SFR user channel hears: 0 the repeat, 1 both (first), 2 both (dual-path RX)

@@ -2601,6 +2601,57 @@ static void test_roger_sounds(void)
 	settings(set_roger_none);
 }
 
+static void set_tac_all(radio_settings_t *s) { s->tac_key = s->tac_unkey = s->tac_rx = true; }
+static void set_tac_none(radio_settings_t *s) { s->tac_key = s->tac_unkey = s->tac_rx = false; }
+
+static uint32_t beeps_tried(void)
+{
+	beep_stats_t bs;
+	beep_get_stats(&bs);
+	return bs.played + bs.no_stream;
+}
+
+// Tactical tones (Settings > Sound): the key tone first, the key-up after it (PTT let go meanwhile keys nothing); the
+// unkey tone once the transmission has ended; the reception tone when the squelch opens. Off, none of them
+static void test_tactical_tones(void)
+{
+	start();
+	uint32_t b0 = beeps_tried();
+	req(RREQ_PTT, 1);
+	CHECK(sm.view.state == RS_TX && beeps_tried() == b0);	// off by default: keys at once, no tone
+	req(RREQ_PTT, 0);
+	run(300);
+	CHECK(sm.view.state == RS_IDLE && beeps_tried() == b0);
+	settings(set_tac_all);
+	unsigned tx0 = hw.tx_calls;
+	req(RREQ_PTT, 1);
+	CHECK(sm.view.state != RS_TX && sm.tac_hold && hw.tx_calls == (int)tx0 && beeps_tried() == b0 + 1);
+	run(250);
+	CHECK(sm.view.state == RS_TX && !sm.tac_hold && hw.tx_calls == (int)tx0 + 1);
+	run(500);
+	req(RREQ_PTT, 0);
+	run(100);
+	CHECK(sm.view.state == RS_IDLE && beeps_tried() == b0 + 2);	// the unkey tone
+	// Let go during the key tone: nothing keyed, no unkey tone
+	req(RREQ_PTT, 1);
+	run(10);
+	req(RREQ_PTT, 0);
+	run(300);
+	CHECK(sm.view.state == RS_IDLE && !sm.tac_hold && hw.tx_calls == (int)tx0 + 1 && beeps_tried() == b0 + 3);
+	// A reception: one tone as the squelch opens
+	signal_on(0, sm.view.ch.rx_hz, 30, no_tone);
+	for (int i = 0; i < 40 && sm.view.state != RS_RX; i++) {
+		run(25);
+	}
+	run(50);
+	CHECK(sm.view.state == RS_RX && beeps_tried() == b0 + 4);
+	run(500);
+	CHECK(beeps_tried() == b0 + 4);
+	hw.sig[0].hz = 0;
+	run(500);
+	settings(set_tac_none);
+}
+
 static void test_roger_burst(void)
 {
 	start();
@@ -3661,6 +3712,7 @@ int main(void)
 	test_tx_limit();
 	test_roger_burst();
 	test_roger_sounds();
+	test_tactical_tones();
 	test_burst_key();
 	test_channel_burst();
 	test_burst_deadlines();

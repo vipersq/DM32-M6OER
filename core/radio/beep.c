@@ -39,6 +39,11 @@ static const beep_seg_t p_message[] = { { 1000, 60 }, { 0, 30 }, { 1300, 60 }, {
 // The speaker test (tests/hil/test_speaker.py): silence with the route up (a pop or a click there is the route's, not
 // the sweep's), the sweep, a short tail
 static const beep_seg_t p_sweep[] = { { 0, 400 }, { BEEP_HZ_SWEEP, 4000 }, { 0, 200 } };
+// Tactical tones, in the style of a military handheld: a crisp rising chirp at key-up, a falling one at unkey, a soft
+// two-note blip when a reception starts. Short: key-up holds the transmitter until it has played
+static const beep_seg_t p_tac_key[] = { { 2000, 30 }, { 0, 15 }, { 2500, 45 } };
+static const beep_seg_t p_tac_unkey[] = { { 2500, 30 }, { 0, 15 }, { 1700, 55 } };
+static const beep_seg_t p_tac_rx[] = { { 1100, 35 }, { 1500, 45 } };
 
 #define PAT(p)	{ p, sizeof(p) / sizeof(p[0]) }
 static const struct {
@@ -58,6 +63,9 @@ static const struct {
 	[BEEP_MESSAGE] = PAT(p_message),
 	[BEEP_TX_PERMIT_SHORT] = PAT(p_permit_short),
 	[BEEP_SWEEP] = PAT(p_sweep),
+	[BEEP_TAC_KEY] = PAT(p_tac_key),
+	[BEEP_TAC_UNKEY] = PAT(p_tac_unkey),
+	[BEEP_TAC_RX] = PAT(p_tac_rx),
 };
 
 // One period of a sine, Q15

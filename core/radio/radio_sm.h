@@ -334,6 +334,11 @@ typedef struct {
 	uint8_t roger_snd;		// the sound playing (roger_sound_t)
 	int8_t roger_step;		// its step on the carrier now
 #endif
+	// Tactical tones (radio_sm.c tac_*): the key-up held for the key tone, and the edges they follow
+	bool tac_hold;			// PTT is down, the key tone plays; ptt_down runs when it is over
+	bool tac_pass;			// ptt_down called from the hold: no second tone
+	uint32_t tac_hold_ms;
+	bool tac_prev_tx, tac_prev_rx;
 #if CONFIG_DMR
 	bool dig_roger;			// DMR / C4FM: the roger sound is in the encoder; the stack still has PTT down
 	uint32_t dig_roger_ms;		// when it started

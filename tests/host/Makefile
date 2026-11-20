@@ -137,7 +137,7 @@ MBEDEC  := $(CORE)/mbe/imbe_dec.c $(CORE)/mbe/imbe_tab.c $(CORE)/mbe/mbe_dsp.c $
            $(CORE)/fec/golay.c $(CORE)/fec/hamming.c
 c4fmVwTest: c4fmVwTest.c $(CORE)/c4fm/ysf_vw.c $(CORE)/c4fm/ysf_vw.h $(MBEDEC)
 	$(CC) $(CFLAGS) -o $@ c4fmVwTest.c $(MBEDEC)
-C4FMLIB := $(CORE)/c4fm/ysf.c $(CORE)/dmr/ambe/ambeFec.c
+C4FMLIB := $(CORE)/c4fm/ysf.c $(CORE)/dmr/ambe/ambeFec.c $(CORE)/c4fm/ysf_vw.c $(CORE)/fec/golay.c $(CORE)/fec/hamming.c
 c4fmYsfTest: c4fmYsfTest.c c4fmOracle.h $(C4FMLIB) $(wildcard $(CORE)/c4fm/*.h)
 	$(CC) $(CFLAGS) -o $@ c4fmYsfTest.c $(C4FMLIB)
 c4fmDspTest: c4fmDspTest.c $(CORE)/c4fm/c4fm_dsp.c $(C4FMLIB) $(wildcard $(CORE)/c4fm/*.h)
@@ -151,6 +151,7 @@ c4fmCallTest: c4fmCallTest.c $(CORE)/c4fm/c4fm_call.c $(CORE)/c4fm/c4fm_dsp.c $(
 
 run: $(TESTS)
 	./c4fmYsfTest
+	./c4fmVwTest
 	./c4fmDspTest
 	./c4fmCallTest
 	./dmrFecTest

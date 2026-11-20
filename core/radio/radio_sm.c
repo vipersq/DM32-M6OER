@@ -4258,6 +4258,17 @@ static void ptt_down(radio_sm_t *sm, uint32_t now_ms)
 		return;
 	}
 #endif
+#if CONFIG_BEEP
+	// Tactical key tone: played first, the key-up waits for it (tac_service). Not when the transmission is already on
+	// (a re-press during its tail), on a no-beep channel or while the host sends its own audio
+	if (sm->set.tac_key && !sm->tac_pass && !sm->tac_hold && sm->view.state != RS_TX && !sm->view.ch.no_beep &&
+	    !sm->host_audio) {
+		beep(sm, BEEP_TAC_KEY);
+		sm->tac_hold = true;
+		sm->tac_hold_ms = now_ms;
+		return;
+	}
+#endif
 #if CONFIG_SUBTONE
 	if (sm->tail_ms != 0 && sm->view.state == RS_TX) {
 		tail_cancel(sm);	// pressed again during the tail: the transmission goes on
@@ -4347,6 +4358,10 @@ static void ptt_down(radio_sm_t *sm, uint32_t now_ms)
 // roger: send the roger beep (if set) before unkeying
 static void ptt_release(radio_sm_t *sm, bool roger, uint32_t now_ms)
 {
+	if (sm->tac_hold) {
+		sm->tac_hold = false;	// let go during the key tone: nothing was keyed
+		return;
+	}
 	if (!sm->ptt) {
 		return;
 	}
@@ -5110,6 +5125,9 @@ static void settings_to_radio(const settings_t *st, radio_settings_t *s)
 	s->bcl = st->rs_bcl;
 	s->roger_beep = (st->rs_flags & SETTINGS_RS_ROGER_BEEP) != 0;
 	s->roger_sound = st->roger_sound < ROGER_COUNT ? st->roger_sound : 0;
+	s->tac_key = (st->tac_flags & SETTINGS_TAC_KEY) != 0;
+	s->tac_unkey = (st->tac_flags & SETTINGS_TAC_UNKEY) != 0;
+	s->tac_rx = (st->tac_flags & SETTINGS_TAC_RX) != 0;
 	s->tx_inhibit = (st->rs_flags & SETTINGS_RS_TX_INHIBIT) != 0;
 	s->scan_priority = (st->rs_flags & SETTINGS_RS_SCAN_PRIORITY) != 0;
 	s->scan_beep = (st->rs_flags & SETTINGS_RS_SCAN_BEEP) != 0;
@@ -5139,6 +5157,8 @@ static void radio_to_settings(const radio_settings_t *s, uint32_t now_ms)
 	st->rs_tot_warn_s = s->tot_warn_s;
 	st->rs_bcl = s->bcl;
 	st->roger_sound = s->roger_sound;
+	st->tac_flags = (uint8_t)((s->tac_key ? SETTINGS_TAC_KEY : 0) | (s->tac_unkey ? SETTINGS_TAC_UNKEY : 0) |
+				  (s->tac_rx ? SETTINGS_TAC_RX : 0));
 	st->rs_flags = (uint8_t)((s->roger_beep ? SETTINGS_RS_ROGER_BEEP : 0) | (s->tx_inhibit ? SETTINGS_RS_TX_INHIBIT : 0) |
 				 (s->scan_priority ? SETTINGS_RS_SCAN_PRIORITY : 0) |
 				 (s->scan_beep ? SETTINGS_RS_SCAN_BEEP : 0) | (s->key_beep ? SETTINGS_RS_KEY_BEEP : 0) |
@@ -5437,6 +5457,7 @@ void radio_sm_init(radio_sm_t *sm, uint32_t now_ms)
 #if CONFIG_C4FM
 	c4fm_call_init(board.c4fm);	// board.c4fm NULL: C4FM isn't offered
 	c4fm_call_set_voice(ambeVoiceSink(), ambeVoiceSource());
+	c4fm_call_set_imbe(ambeVoiceImbeFrame);
 #endif
 #if CONFIG_BEEP
 	ambeVoiceSetMixer(beep_mix);	// beeps while the voice stream owns the PCM audio
@@ -6424,9 +6445,42 @@ static int16_t rssi_held(radio_sm_t *sm, int16_t rssi_dbm)
 }
 #endif
 
+// Tactical tones (Settings > Sound): the held key-up once the key tone is over, the unkey tone when a transmission has
+// ended, the reception tone when one starts. Every poll, before anything returns
+static void tac_service(radio_sm_t *sm, uint32_t now_ms)
+{
+#if CONFIG_BEEP
+	if (sm->tac_hold) {
+		const beep_seg_t *segs;
+		uint32_t len = 0, t = now_ms - sm->tac_hold_ms;
+		for (uint8_t i = beep_pattern(BEEP_TAC_KEY, &segs); i > 0; i--) {
+			len += segs[i - 1].ms;
+		}
+		if ((t >= 40u && !beep_busy()) || t >= len + 100u) {	// played, or a stream that never ran it
+			sm->tac_hold = false;
+			sm->tac_pass = true;
+			ptt_down(sm, now_ms);
+			sm->tac_pass = false;
+		}
+	}
+	bool tx = sm->view.state == RS_TX, rx = sm->view.state == RS_RX;
+	if (sm->tac_prev_tx && !tx && sm->set.tac_unkey && !sm->view.ch.no_beep && !sm->host_audio) {
+		beep(sm, BEEP_TAC_UNKEY);
+	} else if (!sm->tac_prev_rx && rx && !sm->tac_prev_tx && sm->set.tac_rx && !sm->view.ch.no_beep) {
+		beep(sm, BEEP_TAC_RX);
+	}
+	sm->tac_prev_tx = tx;
+	sm->tac_prev_rx = rx;
+#else
+	(void)sm;
+	(void)now_ms;
+#endif
+}
+
 void radio_sm_poll(radio_sm_t *sm, uint32_t now_ms)
 {
 	radio_status_t st;
+	tac_service(sm, now_ms);
 	sm->led_now = now_ms;
 	if (sm->led_timed || sm->deny_led) {
 		outputs(sm);	// as in radio_sm_tick: some paths below return before their outputs()

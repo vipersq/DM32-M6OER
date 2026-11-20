@@ -2,7 +2,6 @@
 // Copyright (c) 2026 The RadioFoundry Authors
 // C4FM DN voice calls (c4fm_call.h)
 #include "ysf_vw.h"
-#include "dmr/ambe/ambeVoice.h"
 #include "c4fm_call.h"
 
 #include <stddef.h>
@@ -13,6 +12,7 @@
 
 static const hal_c4fm_t *modem;
 static const dmr_voice_sink_t *sink;
+static void (*imbe_out)(const uint8_t imbe[IMBE_BYTES], uint8_t errs);	// VW frames (c4fm_call_set_imbe)
 static const dmr_voice_source_t *source;
 static c4fm_config_t cfg;
 static c4fm_call_view_t view;
@@ -177,7 +177,7 @@ static void playAmbe(const uint8_t ambe[YSF_VCH_PER_FRAME][YSF_AMBE_BITS])
 // C4FM VW: the frame's full-rate words into the call (ambeVoiceImbeFrame); the FEC's corrections counted as DN's are
 static void playImbe(const uint8_t *frame, const ysf_fich_t *f)
 {
-	if (!in_call) {
+	if (!in_call || imbe_out == NULL) {
 		return;
 	}
 	uint8_t words = ysfVwWords(f->fn, f->ft);
@@ -186,7 +186,7 @@ static void playImbe(const uint8_t *frame, const ysf_fich_t *f)
 			uint8_t imbe[IMBE_BYTES];
 			uint8_t e = ysfVwDecode(frame, j, imbe);
 			view.rx_vch_errors += IMBE_ERRS_TOTAL(e);
-			ambeVoiceImbeFrame(imbe, e);
+			imbe_out(imbe, e);
 			view.rx_ambe++;
 		}
 	}
@@ -901,6 +901,11 @@ void c4fm_call_init(const hal_c4fm_t *m)
 	running = false;
 	ptt = false;
 	in_call = false;
+}
+
+void c4fm_call_set_imbe(void (*out)(const uint8_t imbe[IMBE_BYTES], uint8_t errs))
+{
+	imbe_out = out;
 }
 
 void c4fm_call_set_voice(const dmr_voice_sink_t *s, const dmr_voice_source_t *src)

@@ -32,6 +32,9 @@ typedef enum {
 	BEEP_MESSAGE,		// a text message arrived (the UI, if Settings > Sound > Message tone)
 	BEEP_TX_PERMIT_SHORT,	// DMR: talk now, played before keying (CAP_BEEP_NOT_ON_AIR): one short tone
 	BEEP_SWEEP,		// speaker test (debug link only): a 4 s sweep, BEEP_SWEEP_LO_HZ to BEEP_SWEEP_HI_HZ
+	BEEP_TAC_KEY,		// tactical tones (Settings > Sound): PTT pressed, before keying
+	BEEP_TAC_UNKEY,		// ... the transmission has ended
+	BEEP_TAC_RX,		// ... a reception starts
 	BEEP_COUNT
 } beep_t;
 

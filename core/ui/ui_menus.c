@@ -5732,6 +5732,12 @@ static const set_item_t s_sound[] = {
 #if CONFIG_VIBRATE
 	TOGGLE(TRN("Vibrate"), "vibration motor silent", UI_SET_VIBRATE),
 #endif
+#if CONFIG_C4FM
+	// Tactical tones, each on its own (off by default): radio_settings_t.tac_*
+	TOGGLE(TRN("Tactical key-up tone"), "military PTT press chirp", UI_SET_TAC_KEY),
+	TOGGLE(TRN("Tactical unkey tone"), "military PTT release chirp", UI_SET_TAC_UNKEY),
+	TOGGLE(TRN("Tactical RX tone"), "military receive start blip", UI_SET_TAC_RX),
+#endif
 };
 static const set_item_t s_display[] = {
 	NUMBER(TRN("Brightness"), "backlight", UI_SET_BRIGHTNESS, 10, 100, 10, "%"),
