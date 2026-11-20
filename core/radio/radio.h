@@ -48,6 +48,7 @@ typedef struct {
 	// Tactical tones on the speaker (Settings > Sound), each on its own, all modes: PTT pressed (the key-up waits for
 	// it), the transmission ended, a reception started. Off by default
 	bool tac_key, tac_unkey, tac_rx;
+	bool leds_off;		// the TX / RX LEDs stay dark (Settings > Tactical)
 	bool tx_inhibit;	// refuse every transmission
 	// Scan (CONFIG_SCAN)
 	uint8_t scan_resume;	// scan_resume_t (radio/scan.h): 0 time, 1 carrier, 2 stop

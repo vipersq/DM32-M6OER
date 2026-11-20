@@ -101,6 +101,8 @@ typedef struct {
 	uint8_t quick_focus;		// 0..8 = tiles 1..9
 	bool quick_edit;		// the focused tile's value editor is open
 	uint8_t brightness;		// backlight percent chosen in quick settings
+	bool tac_red;			// Settings > Tactical: the screen in shades of red (gfx_set_red)
+	uint8_t tac_bright;		// ... its backlight percent, 0 = brightness
 	uint8_t tone_target;		// Tone editor: RADIO_TONE_BOTH, RADIO_TONE_TX or RADIO_TONE_RX
 	subtone_t tone_edit;		// Tone editor: the value picked (shown at once, before the radio's view catches up)
 	uint8_t cc_edit;		// Color code editor: the value picked

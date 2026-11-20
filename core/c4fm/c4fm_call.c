@@ -563,6 +563,9 @@ static void onLost(void *ctx)
 // The input ring (bench capture): written before the receiver sees the block, so a frame's record points past it
 static void capSamples(const int16_t *buf, uint16_t n)
 {
+	if (!CONFIG_C4FM_CAPTURE) {
+		return;
+	}
 	for (uint16_t i = 0; i < n && cap.state != C4FM_CAP_FROZEN; i++) {
 		cap.samples[cap.head] = buf[i];
 		cap.head = (uint16_t)(cap.head + 1u >= C4FM_CAP_SAMPLES ? 0 : cap.head + 1u);

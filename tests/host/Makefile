@@ -147,7 +147,7 @@ TESTS   += c4fmReplay
 c4fmReplay: c4fmReplay.c $(CORE)/c4fm/c4fm_dsp.c $(C4FMLIB) $(wildcard $(CORE)/c4fm/*.h)
 	$(CC) $(CFLAGS) -o $@ c4fmReplay.c $(CORE)/c4fm/c4fm_dsp.c $(C4FMLIB)
 c4fmCallTest: c4fmCallTest.c $(CORE)/c4fm/c4fm_call.c $(CORE)/c4fm/c4fm_dsp.c $(C4FMLIB) $(wildcard $(CORE)/c4fm/*.h)
-	$(CC) $(CFLAGS) -I$(ROOT)/hal -o $@ c4fmCallTest.c $(CORE)/c4fm/c4fm_call.c $(CORE)/c4fm/c4fm_dsp.c $(C4FMLIB)
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -DCONFIG_C4FM_CAPTURE=1 -o $@ c4fmCallTest.c $(CORE)/c4fm/c4fm_call.c $(CORE)/c4fm/c4fm_dsp.c $(C4FMLIB)
 
 run: $(TESTS)
 	./c4fmYsfTest

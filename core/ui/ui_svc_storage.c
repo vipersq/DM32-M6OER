@@ -282,6 +282,12 @@ int32_t ui_svc_setting_get(uint8_t id)
 	case UI_SET_THEME:
 		settings_read(&st);
 		return settings_theme(&st);
+	case UI_SET_TAC_MODE:
+		settings_read(&st);
+		return (st.tac_ui & SETTINGS_TACUI_RED) != 0;
+	case UI_SET_TAC_BRIGHT:
+		settings_read(&st);
+		return st.tac_bright <= 100 ? st.tac_bright : 0;
 	case UI_SET_ACCENT:
 		settings_read(&st);
 		return st.accent & SETTINGS_ACCENT_COLOR;
@@ -484,6 +490,16 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 		st = settings_begin();
 		st->ui_flags = (uint8_t)(value != 0 ? st->ui_flags & ~SETTINGS_UI_NO_VIBRATE :
 					 st->ui_flags | SETTINGS_UI_NO_VIBRATE);
+		settings_end(hal_millis());
+		return true;
+	case UI_SET_TAC_MODE:
+		st = settings_begin();
+		st->tac_ui = (uint8_t)(value != 0 ? st->tac_ui | SETTINGS_TACUI_RED : st->tac_ui & ~SETTINGS_TACUI_RED);
+		settings_end(hal_millis());
+		return true;
+	case UI_SET_TAC_BRIGHT:
+		st = settings_begin();
+		st->tac_bright = (uint8_t)(value <= 0 ? 0 : value > 100 ? 100 : value < 10 ? 10 : value);
 		settings_end(hal_millis());
 		return true;
 	case UI_SET_THEME:

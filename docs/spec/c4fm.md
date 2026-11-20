@@ -294,12 +294,24 @@ the audio callback decodes them with RadioFoundry's full-rate decoder (`core/mbe
 which repeats and then mutes on bad frames. RAM: about 3.4 KB (the decoder's state and scratch). Receive only.
 Host test: `c4fmVwTest`.
 
-## Tactical tones
+## Tactical mode and tones
 
-Settings > Sound: Tactical key-up tone, Tactical unkey tone, Tactical RX tone, each on its own, off by default
+Settings > Tactical (the last group in Settings): Tactical mode (the screen in shades of red: `gfx_set_red`, each palette
+color sent to the display as red of the same brightness, the dimmest lifted to stay visible; the 16-color display's
+palette is the one place colors leave, so icons, meters and anti-aliased text follow), Red brightness (the backlight
+in tactical mode, Normal = the usual brightness; `settings_t.tac_ui`, `tac_bright`), LEDs off (`radio_settings_t.leds_off`:
+the lamps stay dark, the view still has what they would show) and the three tones below. Host tests: gfxTest
+`test_red`, radioFeaturesTest `test_tactical_tones`.
+
+The tones: Key-up tone, Unkey tone, RX tone, each on its own, off by default
 (`radio_settings_t.tac_*`, `settings_t.tac_flags`). Short speaker sounds in the style of a military handheld, every mode
 (`beep.c` BEEP_TAC_*). The key-up tone plays before keying: `ptt_down` holds (`tac_hold`) and `tac_service` keys once
 the tone is over (or after its length + 100 ms if the stream never ran it); PTT let go meanwhile keys nothing. The unkey
 tone follows the end of a transmission (after the roger sound), the RX tone the squelch or a call opening. None on a
 no-beep channel. Host test: radioFeaturesTest `test_tactical_tones`.
+
+## RAM
+
+`CONFIG_C4FM_CAPTURE` (off by default) holds the bench capture's 2 s input ring (32 KB): off, the frame records stay
+and the ring is one sample. The C4FM build's RAM went from 94 % to 79 % with it off.
 

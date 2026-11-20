@@ -455,6 +455,10 @@ static void outputs(radio_sm_t *sm)
 #endif
 	bool red = tx;
 	led_signals(sm, &red, &green);
+	sm->view.leds = (uint8_t)((green ? RADIO_LED_GREEN : 0u) | (red ? RADIO_LED_RED : 0u));
+	if (sm->set.leds_off) {
+		red = green = false;	// Settings > Tactical: the radio shows nothing to the outside
+	}
 	if (sm->green_out != (int8_t)green) {
 		sm->green_out = (int8_t)green;
 		board.power->led(LED_GREEN, green);
@@ -463,7 +467,6 @@ static void outputs(radio_sm_t *sm)
 		sm->red_out = (int8_t)red;
 		board.power->led(LED_RED, red);
 	}
-	sm->view.leds = (uint8_t)((green ? RADIO_LED_GREEN : 0u) | (red ? RADIO_LED_RED : 0u));
 }
 
 static void end_reception(radio_sm_t *sm, uint32_t now_ms)
@@ -5128,6 +5131,7 @@ static void settings_to_radio(const settings_t *st, radio_settings_t *s)
 	s->tac_key = (st->tac_flags & SETTINGS_TAC_KEY) != 0;
 	s->tac_unkey = (st->tac_flags & SETTINGS_TAC_UNKEY) != 0;
 	s->tac_rx = (st->tac_flags & SETTINGS_TAC_RX) != 0;
+	s->leds_off = (st->tac_flags & SETTINGS_TAC_LEDS_OFF) != 0;
 	s->tx_inhibit = (st->rs_flags & SETTINGS_RS_TX_INHIBIT) != 0;
 	s->scan_priority = (st->rs_flags & SETTINGS_RS_SCAN_PRIORITY) != 0;
 	s->scan_beep = (st->rs_flags & SETTINGS_RS_SCAN_BEEP) != 0;
@@ -5158,7 +5162,7 @@ static void radio_to_settings(const radio_settings_t *s, uint32_t now_ms)
 	st->rs_bcl = s->bcl;
 	st->roger_sound = s->roger_sound;
 	st->tac_flags = (uint8_t)((s->tac_key ? SETTINGS_TAC_KEY : 0) | (s->tac_unkey ? SETTINGS_TAC_UNKEY : 0) |
-				  (s->tac_rx ? SETTINGS_TAC_RX : 0));
+				  (s->tac_rx ? SETTINGS_TAC_RX : 0) | (s->leds_off ? SETTINGS_TAC_LEDS_OFF : 0));
 	st->rs_flags = (uint8_t)((s->roger_beep ? SETTINGS_RS_ROGER_BEEP : 0) | (s->tx_inhibit ? SETTINGS_RS_TX_INHIBIT : 0) |
 				 (s->scan_priority ? SETTINGS_RS_SCAN_PRIORITY : 0) |
 				 (s->scan_beep ? SETTINGS_RS_SCAN_BEEP : 0) | (s->key_beep ? SETTINGS_RS_KEY_BEEP : 0) |

@@ -1838,7 +1838,7 @@ void ui_app_init(void)
 		ui_svc_apply(id, ui_svc_setting_get(id));
 	static const uint8_t ui_ids[] = { UI_SET_HINTS, UI_SET_LARGE_TEXT, UI_SET_AUTO_LOCK_S, UI_SET_BRIGHTNESS,
 					  UI_SET_ALIAS_SHOW, UI_SET_PTT_LOCKED, UI_SET_HEAR_ALL_DEFAULT, UI_SET_MESSAGE_TONE,
-					  UI_SET_UPDOWN_HOME, UI_SET_LABEL_FIRST, UI_SET_LOW_BATTERY, UI_SET_AUTO_OFF_MIN, UI_SET_THEME, UI_SET_ACCENT,
+					  UI_SET_UPDOWN_HOME, UI_SET_LABEL_FIRST, UI_SET_LOW_BATTERY, UI_SET_AUTO_OFF_MIN, UI_SET_THEME, UI_SET_ACCENT, UI_SET_TAC_MODE, UI_SET_TAC_BRIGHT,
 					  UI_SET_STRIP, UI_SET_VIBRATE, UI_SET_VOLUME, UI_SET_LANGUAGE,
 					  UI_SET_KNOB_WHEN_LOCKED,
 #if CONFIG_DUAL_WATCH
@@ -1864,7 +1864,10 @@ void ui_app_init(void)
 	dirty = true;
 }
 
-uint8_t ui_app_brightness(void) { return ui_st.brightness; }
+uint8_t ui_app_brightness(void)
+{
+	return ui_st.tac_red && ui_st.tac_bright != 0 ? ui_st.tac_bright : ui_st.brightness;	// tactical mode's own
+}
 bool ui_app_power_off_due(void) { return power_off_due; }
 
 static uint16_t clamp_u16(int32_t v) { return (uint16_t)(v < 0 ? 0 : v > 0xFFFF ? 0xFFFF : v); }
@@ -1905,6 +1908,13 @@ void ui_apply_setting(uint8_t id, int32_t v)
 		break;
 	case UI_SET_THEME:
 		ui_theme_set((uint8_t)v);
+		break;
+	case UI_SET_TAC_MODE:
+		ui_st.tac_red = v != 0;
+		gfx_set_red(ui_st.tac_red);
+		break;
+	case UI_SET_TAC_BRIGHT:
+		ui_st.tac_bright = (uint8_t)(v >= 10 && v <= 100 ? v : 0);
 		break;
 	case UI_SET_ACCENT:
 		ui_accent_set((uint8_t)v);

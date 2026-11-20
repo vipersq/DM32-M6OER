@@ -25,6 +25,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "config.h"
 #include "hal_c4fm.h"
 #include "dmr/call/dmr_call.h"	// dmr_voice_sink_t / dmr_voice_source_t: the voice path is shared with DMR
 #include "c4fm/c4fm_dsp.h"
@@ -157,7 +158,11 @@ const c4fm_raw_t *c4fm_call_raw(void);
 // Bench capture (diagnostics, docs/spec/c4fm.md 8): the receiver's input audio in a ring, and the last frames' figures.
 // Armed, the ring freezes C4FM_CAP_POST samples after the next call starts (a header or a late entry), so it holds
 // the lead-in and the call's first frames; read it from RAM over the debug link (READ_MEM at samples)
+#if CONFIG_C4FM_CAPTURE
 #define C4FM_CAP_SAMPLES	16000	// 2 s at 8 kHz
+#else
+#define C4FM_CAP_SAMPLES	1	// the ring is off (CONFIG_C4FM_CAPTURE): 32 KB of RAM back; frames are still recorded
+#endif
 #define C4FM_CAP_POST		12000	// 1.5 s after the call starts
 #define C4FM_CAP_FRAMES		32
 enum { C4FM_CAP_RUN, C4FM_CAP_ARMED, C4FM_CAP_TRIGGERED, C4FM_CAP_FROZEN };

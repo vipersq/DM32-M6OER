@@ -369,10 +369,15 @@ typedef enum {
 	UI_SET_TAC_KEY,
 	UI_SET_TAC_UNKEY,
 	UI_SET_TAC_RX,
+	UI_SET_TAC_LEDS,	// Settings > Tactical: the LEDs off (radio_settings_t.leds_off), 1 off, 0 as usual
 	UI_SET_CH_WIDE,
 	UI_SET_CH_RX_TONE,
 	UI_SET_CH_TX_TONE,
 	UI_SET_VFO_OFFSET,
+	// Settings > Tactical (settings_t.tac_ui, tac_bright): the red screen 1 on / 0 off, and its backlight 10-100 %
+	// (0: the normal brightness)
+	UI_SET_TAC_MODE,
+	UI_SET_TAC_BRIGHT,
 	UI_SET_COUNT
 } ui_setting_t;
 

@@ -486,9 +486,27 @@ static void test_cjk_text(void)
 }
 #endif
 
+// Tactical mode's red (gfx_red_of): black stays black, white is full red, every color is red alone, brighter colors
+// stay brighter, and the dimmest gray is lifted to a red that shows
+static void test_red(void)
+{
+	CHECK(gfx_red_of(RGB565(0, 0, 0)) == 0 && gfx_red_of(RGB565(255, 255, 255)) == RGB565(255, 0, 0));
+	static const color_t cs[] = { RGB565(32, 96, 200), RGB565(40, 184, 72), RGB565(224, 32, 32), RGB565(72, 72, 72),
+				      RGB565(168, 168, 168), RGB565(16, 16, 16) };
+	for (unsigned i = 0; i < sizeof cs / sizeof cs[0]; i++)
+		CHECK((gfx_red_of(cs[i]) & 0x07FFu) == 0 && (gfx_red_of(cs[i]) >> 11) >= 48u / 8u);
+	CHECK((gfx_red_of(RGB565(168, 168, 168)) >> 11) > (gfx_red_of(RGB565(72, 72, 72)) >> 11));
+	CHECK(!gfx_red_on());
+	gfx_set_red(true);
+	CHECK(gfx_red_on());
+	gfx_set_red(false);
+	CHECK(!gfx_red_on());
+}
+
 int main(void)
 {
 	mkdir("out", 0755);
+	test_red();
 
 	char buf[32];
 	sbuf_t b;

@@ -283,6 +283,9 @@
 #ifndef CONFIG_C4FM
 #define CONFIG_C4FM			0
 #endif
+#ifndef CONFIG_C4FM_CAPTURE
+#define CONFIG_C4FM_CAPTURE		0
+#endif
 #ifndef CONFIG_APRS_RX
 #define CONFIG_APRS_RX			CONFIG_APRS_AFSK
 #endif

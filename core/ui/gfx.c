@@ -21,6 +21,7 @@ static uint8_t row_new[(GFX_MAX_ROWS + 7u) / 8u];	// bit y: row y changed since 
 // bpp 4: the colors the indexes stand for. An entry is only given a new color once nothing drawn since the last clear
 // uses it, so no pixel on the screen changes color under it
 static color_t pal[16], pal_sent[16];	// pal_sent: as the display last got it
+static color_t pal_out[16];		// pal_sent as the display gets it (red in tactical mode)
 static uint8_t pal_n, pal_n_sent;	// entries set
 static uint16_t pal_used;		// bit n: entry n drawn since the last gfx_clear
 static color_t last_color;		// the last lookup, for runs of one color (text is drawn pixel by pixel)
@@ -870,11 +871,40 @@ static uint32_t hash_row(int y)
 	return h;
 }
 
+static bool red_mode;
+
+color_t gfx_red_of(color_t c)
+{
+	// RGB565 to 8 bits a channel, the brightness (Rec. 601 luma), then red alone. A touch of lift keeps the dimmest
+	// grays (lines, idle text) above black
+	uint32_t r = (c >> 11) & 31u, g = (c >> 5) & 63u, b = c & 31u;
+	r = (r << 3) | (r >> 2);
+	g = (g << 2) | (g >> 4);
+	b = (b << 3) | (b >> 2);
+	uint32_t y = (77u * r + 150u * g + 29u * b) >> 8;
+	if (y != 0 && y < 48u)
+		y = 48u;
+	return (color_t)((y >> 3) << 11);
+}
+
+bool gfx_red_on(void)
+{
+	return red_mode;
+}
+
+void gfx_set_red(bool on)
+{
+	if (on != red_mode) {
+		red_mode = on;
+		all_dirty = true;
+	}
+}
+
 static void send(int y0, int y1)
 {
 #if GFX_INDEXED
 	if (bpp == 4) {
-		display->flush_indexed(fb_words, pal_sent, (uint16_t)y0, (uint16_t)y1);
+		display->flush_indexed(fb_words, red_mode ? pal_out : pal_sent, (uint16_t)y0, (uint16_t)y1);
 		return;
 	}
 #endif
@@ -892,6 +922,8 @@ void gfx_flush(void)
 				all_dirty = true;
 		memcpy(pal_sent, pal, sizeof pal);
 		pal_n_sent = pal_n;
+		for (int i = 0; i < 16; i++)
+			pal_out[i] = gfx_red_of(pal_sent[i]);
 	}
 #endif
 	int band = -1;

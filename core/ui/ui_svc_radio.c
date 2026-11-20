@@ -74,6 +74,7 @@ int32_t ui_svc_fm_get(uint8_t id)
 	case UI_SET_TAC_KEY: return s->tac_key;
 	case UI_SET_TAC_UNKEY: return s->tac_unkey;
 	case UI_SET_TAC_RX: return s->tac_rx;
+	case UI_SET_TAC_LEDS: return s->leds_off;
 	default: return s->roger_beep ? (int32_t)s->roger_sound + 1 : 0;
 	}
 }
@@ -81,8 +82,9 @@ int32_t ui_svc_fm_get(uint8_t id)
 void ui_svc_fm_set(uint8_t id, int32_t value)
 {
 	radio_settings_t was = *rs_copy();
-	if (id == UI_SET_TAC_KEY || id == UI_SET_TAC_UNKEY || id == UI_SET_TAC_RX) {
-		bool *f = id == UI_SET_TAC_KEY ? &rs.tac_key : id == UI_SET_TAC_UNKEY ? &rs.tac_unkey : &rs.tac_rx;
+	if (id == UI_SET_TAC_KEY || id == UI_SET_TAC_UNKEY || id == UI_SET_TAC_RX || id == UI_SET_TAC_LEDS) {
+		bool *f = id == UI_SET_TAC_KEY ? &rs.tac_key : id == UI_SET_TAC_UNKEY ? &rs.tac_unkey :
+			  id == UI_SET_TAC_RX ? &rs.tac_rx : &rs.leds_off;
 		*f = value != 0;
 	} else if (id == UI_SET_FM_BCL) {
 		rs.bcl = (uint8_t)(value < RADIO_BCL_OFF ? RADIO_BCL_OFF : value > RADIO_BCL_WRONG_TONE ? RADIO_BCL_WRONG_TONE

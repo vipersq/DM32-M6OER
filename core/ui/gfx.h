@@ -37,6 +37,13 @@ bool gfx_init(const hal_display_t *disp);
 int gfx_width(void);
 int gfx_height(void);
 int gfx_bpp(void);
+// Tactical mode (Settings > Tactical): every color goes to the display as red of the same brightness, so the screen
+// reads at night without the glare of white and blue (the whole frame is sent again on a change). On the indexed
+// (16 color) display, where the palette is the one place colors leave; elsewhere it does nothing
+void gfx_set_red(bool on);
+// The red the display gets for a color (tests, the gallery)
+color_t gfx_red_of(color_t c);
+bool gfx_red_on(void);
 const void *gfx_framebuffer(void);
 
 // Drawing is clipped to this rectangle (and always to the screen)

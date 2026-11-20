@@ -51,6 +51,8 @@ bool sim_save_png(const char *path, int scale)
 		r[0] = 0;	// filter: none
 		for (int x = 0; x < w; x++) {
 			color_t c = gfx_get_pixel(x / scale, y / scale);
+			if (gfx_red_on())
+				c = gfx_red_of(c);	// what the display shows in tactical mode
 			if (mono) {
 				if (c)
 					r[1 + x / 8] |= (unsigned char)(0x80u >> (x & 7));
@@ -178,6 +180,8 @@ bool sim_sheet_add(const char *label)
 	for (int y = 0; y < sheet.ch; y++) {
 		for (int x = 0; x < sheet.cw; x++) {
 			color_t c = gfx_get_pixel(x / s, y / s);
+			if (gfx_red_on())
+				c = gfx_red_of(c);
 			uint32_t rgb = mono ? (c ? 0x141810u : 0xC8D0B8u) :	// the paper and ink of sim_save_png
 				(uint32_t)(((c >> 11) & 31) * 255 / 31) << 16 | (uint32_t)(((c >> 5) & 63) * 255 / 63) << 8 |
 				(uint32_t)((c & 31) * 255 / 31);

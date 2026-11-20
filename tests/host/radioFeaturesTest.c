@@ -2603,6 +2603,8 @@ static void test_roger_sounds(void)
 
 static void set_tac_all(radio_settings_t *s) { s->tac_key = s->tac_unkey = s->tac_rx = true; }
 static void set_tac_none(radio_settings_t *s) { s->tac_key = s->tac_unkey = s->tac_rx = false; }
+static void set_leds_off(radio_settings_t *s) { s->leds_off = true; }
+static void set_leds_on(radio_settings_t *s) { s->leds_off = false; }
 
 static uint32_t beeps_tried(void)
 {
@@ -2650,6 +2652,19 @@ static void test_tactical_tones(void)
 	hw.sig[0].hz = 0;
 	run(500);
 	settings(set_tac_none);
+	// LEDs off (Settings > Tactical): the radio still knows what they would show, the lamps stay dark
+	settings(set_leds_off);
+	req(RREQ_PTT, 1);
+	run(100);
+	CHECK(sm.view.state == RS_TX && (sm.view.leds & RADIO_LED_RED) && !hw.led[LED_RED] && !hw.led[LED_GREEN]);
+	req(RREQ_PTT, 0);
+	run(300);
+	settings(set_leds_on);
+	req(RREQ_PTT, 1);
+	run(100);
+	CHECK(sm.view.state == RS_TX && hw.led[LED_RED]);
+	req(RREQ_PTT, 0);
+	run(300);
 }
 
 static void test_roger_burst(void)

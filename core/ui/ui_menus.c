@@ -5732,12 +5732,6 @@ static const set_item_t s_sound[] = {
 #if CONFIG_VIBRATE
 	TOGGLE(TRN("Vibrate"), "vibration motor silent", UI_SET_VIBRATE),
 #endif
-#if CONFIG_C4FM
-	// Tactical tones, each on its own (off by default): radio_settings_t.tac_*
-	TOGGLE(TRN("Tactical key-up tone"), "military PTT press chirp", UI_SET_TAC_KEY),
-	TOGGLE(TRN("Tactical unkey tone"), "military PTT release chirp", UI_SET_TAC_UNKEY),
-	TOGGLE(TRN("Tactical RX tone"), "military receive start blip", UI_SET_TAC_RX),
-#endif
 };
 static const set_item_t s_display[] = {
 	NUMBER(TRN("Brightness"), "backlight", UI_SET_BRIGHTNESS, 10, 100, 10, "%"),
@@ -6001,6 +5995,22 @@ static const set_item_t s_advanced[] = {
 #endif
 };
 
+#if CONFIG_C4FM
+// Settings > Tactical: the red screen and its own backlight, dark LEDs, and the tactical tones (each on its own, all off
+// by default; settings_t.tac_ui / tac_bright, radio_settings_t.tac_* / leds_off)
+static const int16_t v_tac_bright[] = { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
+static const char *const n_tac_bright[] = { TRN("Normal"), "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%",
+	"90%", "100%" };
+static const set_item_t s_tactical[] = {
+	TOGGLE(TRN("Tactical mode"), "red screen night vision military", UI_SET_TAC_MODE),
+	LIST(TRN("Red brightness"), "tactical backlight night", UI_SET_TAC_BRIGHT, v_tac_bright, n_tac_bright),
+	TOGGLE(TRN("LEDs off"), "tactical dark light TX RX lamp", UI_SET_TAC_LEDS),
+	TOGGLE(TRN("Key-up tone"), "tactical military PTT press chirp", UI_SET_TAC_KEY),
+	TOGGLE(TRN("Unkey tone"), "tactical military PTT release chirp", UI_SET_TAC_UNKEY),
+	TOGGLE(TRN("RX tone"), "tactical military receive start blip", UI_SET_TAC_RX),
+};
+#endif
+
 #define GROUP(nm, a)		{ nm, nm, a, sizeof a / sizeof a[0] }
 #define GROUP_T(nm, t, a)	{ nm, t, a, sizeof a / sizeof a[0] }
 static const set_group_t groups[] = {
@@ -6017,6 +6027,7 @@ static const set_group_t groups[] = {
 	GROUP(TRN("Keys"), s_keys), GROUP(TRN("Key lock"), s_lock),
 	GROUP_T(TRN("My radio"), TRN("My Radio"), s_my_radio), GROUP(TRN("Advanced"), s_advanced),
 #if CONFIG_C4FM
+	GROUP(TRN("Tactical"), s_tactical),
 	// The mode pages: last, not listed in Settings (settings_shown); Menu opens them
 	GROUP(TRN("FM"), s_fm), GROUP(TRN("DMR"), s_dmr), GROUP(TRN("C4FM"), s_c4fm),
 	GROUP_T(TRN("C4FM advanced"), TRN("C4FM Advanced"), s_c4fm_adv),
