@@ -295,7 +295,7 @@ Host test: `c4fmVwTest`.
 
 ## Tactical mode and tones
 
-Settings > Tactical (the last group in Settings), with a Tone style (Deep, the default; Bloop; Low chirp; High chirp: `beep_tac_style`, a change plays the key-up tone at once): Tactical mode (the screen in shades of red: `gfx_set_red`, each palette
+Settings > Tactical (the last group in Settings), with a Tone style (Deep, the default; Bloop; Low chirp; High chirp; Harris-like, measured from a recording: key-up 1000 Hz 200 ms, unkey 1000 Hz 130 ms with a buzz, reception start / end a buzzing 640 Hz 90 / 140 ms, the buzz `BEEP_HZ_BUZZ` = the 3rd and 5th harmonics; `beep_tac_style`, a change plays the key-up tone at once): Tactical mode (the screen in shades of red: `gfx_set_red`, each palette
 color sent to the display as red of the same brightness, the dimmest lifted to stay visible; the 16-color display's
 palette is the one place colors leave, so icons, meters and anti-aliased text follow), Red brightness (the backlight
 in tactical mode, Normal = the usual brightness; `settings_t.tac_ui`, `tac_bright`), LEDs off (`radio_settings_t.leds_off`:

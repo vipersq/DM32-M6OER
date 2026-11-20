@@ -97,7 +97,7 @@ void ui_svc_fm_set(uint8_t id, int32_t value)
 	} else if (id == UI_SET_TAC_RXEND) {
 		rs.tac_rxend = value != 0;
 	} else if (id == UI_SET_TAC_STYLE) {
-		rs.tac_style = (uint8_t)(value < 0 || value > 3 ? 0 : value);
+		rs.tac_style = (uint8_t)(value < 0 || value >= BEEP_TAC_STYLES ? 0 : value);
 	} else if (id == UI_SET_TAC_KEY || id == UI_SET_TAC_UNKEY || id == UI_SET_TAC_RX || id == UI_SET_TAC_LEDS) {
 		bool *f = id == UI_SET_TAC_KEY ? &rs.tac_key : id == UI_SET_TAC_UNKEY ? &rs.tac_unkey :
 			  id == UI_SET_TAC_RX ? &rs.tac_rx : &rs.leds_off;

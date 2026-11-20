@@ -46,6 +46,10 @@ typedef struct {
 
 // A segment with this hz is a linear sweep from BEEP_SWEEP_LO_HZ to BEEP_SWEEP_HI_HZ over its length, phase continuous
 #define BEEP_HZ_SWEEP		1u
+// A tone with a buzz: the fundamental with its 3rd and 5th harmonics (1/3, 1/5), near a square wave, the timbre of a
+// military handheld's alert tones. hz | BEEP_HZ_BUZZ; the frequency is hz & BEEP_HZ_MASK
+#define BEEP_HZ_BUZZ		0x8000u
+#define BEEP_HZ_MASK		0x7FFFu
 #define BEEP_SWEEP_LO_HZ	150u
 #define BEEP_SWEEP_HI_HZ	3800u	// the 8 kHz stream's band, short of its 4 kHz edge
 
@@ -60,8 +64,8 @@ typedef struct {
 } beep_stats_t;
 
 #define BEEP_SEGS_MAX	6
-// Tactical tone styles (beep_tac_style): 0 deep, 1 bloop, 2 low chirp, 3 high chirp
-#define BEEP_TAC_STYLES	4
+// Tactical tone styles (beep_tac_style): 0 deep, 1 bloop, 2 low chirp, 3 high chirp, 4 Harris-like
+#define BEEP_TAC_STYLES	5
 #define BEEP_TAC_EVENTS	4	// BEEP_TAC_KEY .. BEEP_TAC_RXEND, in that order
 void beep_tac_style(uint8_t style);
 

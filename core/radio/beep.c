@@ -58,6 +58,13 @@ static const beep_seg_t p_tac_key_h[] = { { 2000, 30 }, { 0, 15 }, { 2500, 45 } 
 static const beep_seg_t p_tac_unkey_h[] = { { 2500, 30 }, { 0, 15 }, { 1700, 55 } };
 static const beep_seg_t p_tac_rx_h[] = { { 1100, 35 }, { 1500, 45 } };
 static const beep_seg_t p_tac_rxend_h[] = { { 1500, 35 }, { 1100, 45 } };
+// Harris-like: measured from a recording of a military handheld (the user's): key-up a clean 1000 Hz for 200 ms, unkey
+// 1000 Hz with a buzz for 130 ms, a reception's start and end a buzzing 640 Hz, 90 ms and 140 ms
+#define BZ(hz)	((uint16_t)((hz) | BEEP_HZ_BUZZ))
+static const beep_seg_t p_tac_key_m[] = { { 1000, 200 } };
+static const beep_seg_t p_tac_unkey_m[] = { { BZ(1000), 130 } };
+static const beep_seg_t p_tac_rx_m[] = { { BZ(640), 90 } };
+static const beep_seg_t p_tac_rxend_m[] = { { BZ(640), 140 } };
 
 #define PAT(p)	{ p, sizeof(p) / sizeof(p[0]) }
 static const struct {
@@ -88,8 +95,10 @@ static const struct {
 	[BEEP_COUNT + 7] = PAT(p_tac_rxend_c),
 	[BEEP_COUNT + 8] = PAT(p_tac_key_h), [BEEP_COUNT + 9] = PAT(p_tac_unkey_h), [BEEP_COUNT + 10] = PAT(p_tac_rx_h),
 	[BEEP_COUNT + 11] = PAT(p_tac_rxend_h),
+	[BEEP_COUNT + 12] = PAT(p_tac_key_m), [BEEP_COUNT + 13] = PAT(p_tac_unkey_m), [BEEP_COUNT + 14] = PAT(p_tac_rx_m),
+	[BEEP_COUNT + 15] = PAT(p_tac_rxend_m),
 };
-_Static_assert(BEEP_TAC_STYLES == 4, "a set past the table per style but the first");
+_Static_assert(BEEP_TAC_STYLES == 5, "a set past the table per style but the first");
 
 static volatile uint8_t tac_style;	// beep_tac_style
 
@@ -137,6 +146,7 @@ static uint8_t cb_seg;
 static uint32_t cb_left;	// samples left in the segment
 static uint32_t cb_len;		// samples in the segment
 static uint32_t cb_phase, cb_step;
+static bool cb_buzz;		// the segment's tone has the buzz (BEEP_HZ_BUZZ)
 static uint32_t cb_dstep;	// the sweep's step increase per sample, 0 for a tone
 static int32_t cb_amp;
 static volatile bool cb_active;
@@ -295,7 +305,8 @@ static void load_seg(void)
 	const beep_seg_t *s = &patterns[cb_pattern].segs[cb_seg];
 	cb_len = cb_left = (uint32_t)s->ms * (AUDIO_RATE_HZ / 1000);
 	// Phase step: hz / rate of a 2^32 turn
-	cb_step = (uint32_t)(((uint64_t)s->hz << 32) / AUDIO_RATE_HZ);
+	cb_buzz = s->hz != BEEP_HZ_SWEEP && (s->hz & BEEP_HZ_BUZZ) != 0;
+	cb_step = (uint32_t)(((uint64_t)(s->hz == BEEP_HZ_SWEEP ? s->hz : s->hz & BEEP_HZ_MASK) << 32) / AUDIO_RATE_HZ);
 	cb_dstep = 0;
 	if (s->hz == BEEP_HZ_SWEEP && cb_len != 0) {
 		cb_step = (uint32_t)(((uint64_t)BEEP_SWEEP_LO_HZ << 32) / AUDIO_RATE_HZ);
@@ -344,6 +355,11 @@ static bool tone_mix(int16_t *spk)
 			int32_t frac = (int32_t)((cb_phase >> 16) & 0x3FFu);
 			int32_t a = sine[idx], b = sine[(idx + 1) & 63u];
 			int32_t v = a + (((b - a) * frac) >> 10);
+			if (cb_buzz) {	// + the 3rd and 5th harmonics at 1/3 and 1/5, the sum scaled back to the sine's peak
+				uint32_t p3 = cb_phase * 3u, p5 = cb_phase * 5u;
+				int32_t h3 = sine[p3 >> 26], h5 = sine[p5 >> 26];
+				v = (v + h3 / 3 + h5 / 5) * 3 / 4;
+			}
 			int32_t out = spk[i] + ((v * amp) >> 15);
 			spk[i] = (int16_t)(out > 32767 ? 32767 : out < -32768 ? -32768 : out);
 			cb_phase += cb_step;

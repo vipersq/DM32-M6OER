@@ -387,6 +387,7 @@ static inline void settings_set_crash_contact(settings_t *s, uint16_t num)
 #define SETTINGS_TAC_STYLE_SHIFT	4	// bits 4-5: the tactical tones' style (beep.h BEEP_TAC_STYLES; 0 deep)
 #define SETTINGS_TAC_STYLE_MASK		0x30u
 #define SETTINGS_TAC_RXEND		0x40u	// the reception end tone
+#define SETTINGS_TAC_STYLE_HI		0x80u	// the style's bit 2 (styles 4 and up)
 // tac_modes: bit (1 << radio_mode_t) of the low nibble, the tactical tones off in that mode; of the high, the roger
 #define SETTINGS_TACM_TONES_SHIFT	0
 #define SETTINGS_TACM_ROGER_SHIFT	4

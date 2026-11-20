@@ -5135,7 +5135,8 @@ static void settings_to_radio(const settings_t *st, radio_settings_t *s)
 	s->tac_unkey = (st->tac_flags & SETTINGS_TAC_UNKEY) != 0;
 	s->tac_rx = (st->tac_flags & SETTINGS_TAC_RX) != 0;
 	s->leds_off = (st->tac_flags & SETTINGS_TAC_LEDS_OFF) != 0;
-	s->tac_style = (uint8_t)((st->tac_flags & SETTINGS_TAC_STYLE_MASK) >> SETTINGS_TAC_STYLE_SHIFT);
+	s->tac_style = (uint8_t)(((st->tac_flags & SETTINGS_TAC_STYLE_MASK) >> SETTINGS_TAC_STYLE_SHIFT) |
+				 ((st->tac_flags & SETTINGS_TAC_STYLE_HI) != 0 ? 4u : 0u));
 	s->tac_rxend = (st->tac_flags & SETTINGS_TAC_RXEND) != 0;
 	s->tones_off = (uint8_t)((st->tac_modes >> SETTINGS_TACM_TONES_SHIFT) & 0x0Fu);
 	s->roger_off = (uint8_t)((st->tac_modes >> SETTINGS_TACM_ROGER_SHIFT) & 0x0Fu);
@@ -5171,7 +5172,7 @@ static void radio_to_settings(const radio_settings_t *s, uint32_t now_ms)
 	st->tac_flags = (uint8_t)((s->tac_key ? SETTINGS_TAC_KEY : 0) | (s->tac_unkey ? SETTINGS_TAC_UNKEY : 0) |
 				  (s->tac_rx ? SETTINGS_TAC_RX : 0) | (s->leds_off ? SETTINGS_TAC_LEDS_OFF : 0) |
 				  ((s->tac_style << SETTINGS_TAC_STYLE_SHIFT) & SETTINGS_TAC_STYLE_MASK) |
-				  (s->tac_rxend ? SETTINGS_TAC_RXEND : 0));
+				  (s->tac_rxend ? SETTINGS_TAC_RXEND : 0) | ((s->tac_style & 4u) != 0 ? SETTINGS_TAC_STYLE_HI : 0));
 	st->tac_modes = (uint8_t)(((s->tones_off & 0x0Fu) << SETTINGS_TACM_TONES_SHIFT) |
 				  ((s->roger_off & 0x0Fu) << SETTINGS_TACM_ROGER_SHIFT));
 	st->rs_flags = (uint8_t)((s->roger_beep ? SETTINGS_RS_ROGER_BEEP : 0) | (s->tx_inhibit ? SETTINGS_RS_TX_INHIBIT : 0) |

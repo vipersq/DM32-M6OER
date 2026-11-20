@@ -2613,6 +2613,7 @@ static void set_leds_on(radio_settings_t *s) { s->leds_off = false; }
 static void set_tac_style_deep(radio_settings_t *s) { s->tac_style = 0; }
 static void set_tac_style_bloop(radio_settings_t *s) { s->tac_style = 1; }
 static void set_tac_style_high(radio_settings_t *s) { s->tac_style = 3; }
+static void set_tac_style_harris(radio_settings_t *s) { s->tac_style = 4; }
 static void set_tac_rxend(radio_settings_t *s) { s->tac_key = s->tac_unkey = s->tac_rx = false; s->tac_rxend = true; }
 static void set_tac_all_fm_off(radio_settings_t *s)
 {
@@ -2691,6 +2692,11 @@ static void test_tactical_tones(void)
 	settings(set_tac_style_high);
 	run(50);
 	CHECK(beeps_tried() == b1 + 2 && beep_pattern(BEEP_TAC_UNKEY, &seg) >= 1 && seg[0].hz >= 2000);
+	settings(set_tac_style_harris);	// measured: key-up a clean 1000 Hz 200 ms, reception a buzzing 640 Hz
+	run(50);
+	CHECK(beep_pattern(BEEP_TAC_KEY, &seg) == 1 && seg[0].hz == 1000 && seg[0].ms == 200);
+	CHECK(beep_pattern(BEEP_TAC_RX, &seg) == 1 && seg[0].hz == (640 | BEEP_HZ_BUZZ) && seg[0].ms == 90);
+	CHECK(beep_pattern(BEEP_TAC_RXEND, &seg) == 1 && (seg[0].hz & BEEP_HZ_MASK) == 640 && seg[0].ms == 140);
 	settings(set_tac_style_deep);
 	run(50);
 	CHECK(beep_pattern(BEEP_TAC_KEY, &seg) >= 1 && seg == deep);
