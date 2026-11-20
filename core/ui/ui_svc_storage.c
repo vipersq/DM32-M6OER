@@ -386,6 +386,9 @@ static __attribute__((noinline)) int32_t setting_get_flash(uint8_t id)
 	case UI_SET_VOICE_RX_GAIN:
 		settings_read(&st);
 		return (int16_t)clamp16(st.voice_rx_gain, -6, 12);	// clamp16 is unsigned: back to the sign
+	case UI_SET_MIC_COMP:
+		settings_read(&st);
+		return st.mic_comp > 2 ? 0 : st.mic_comp;
 	case UI_SET_C4FM_FT70D:
 		settings_read(&st);
 		return (st.c4fm_flags & SETTINGS_C4FM_PLAIN) == 0;
@@ -621,6 +624,7 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 	case UI_SET_C4FM_TX_LEVEL:
 	case UI_SET_C4FM_PREAMBLE:
 	case UI_SET_VOICE_RX_GAIN:
+	case UI_SET_MIC_COMP:
 	case UI_SET_C4FM_FT70D:
 		st = settings_begin();
 		if (id == UI_SET_C4FM_TX_LEVEL) {
@@ -629,6 +633,8 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 			st->c4fm_preamble = (uint8_t)(clamp16(value, 100, 500) / 100);
 		} else if (id == UI_SET_VOICE_RX_GAIN) {
 			st->voice_rx_gain = (int8_t)(clamp16(value, -6, 12) & ~1);
+		} else if (id == UI_SET_MIC_COMP) {
+			st->mic_comp = (uint8_t)clamp16(value, 0, 2);
 		} else {
 			// Send as FT-70D; the unused bits go back to 0
 			st->c4fm_flags = (uint8_t)(value ? 0 : SETTINGS_C4FM_PLAIN);
@@ -1743,7 +1749,7 @@ uint8_t ui_svc_home_key(uint8_t action, uint8_t gesture, bool home)
 bool ui_svc_key_offered(uint8_t id, int32_t value)
 {
 	uint8_t k = (uint8_t)(id - UI_SET_KEY_FIRST);
-	if (id < UI_SET_KEY_FIRST || id > UI_SET_KEY_LAST || value < 0 || value >= KEYFN_COUNT) {
+	if (id < UI_SET_KEY_FIRST || id > UI_SET_KEY_LAST || value < 0 || value > 0xFF) {
 		return false;
 	}
 	if (k / 2u < board.side_key_count) {

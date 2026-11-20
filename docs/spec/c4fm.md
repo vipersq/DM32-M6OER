@@ -355,3 +355,17 @@ where it is now (settings.c `fork_record_move`); the stored power levels go back
 - Mic gain: the DM-32 now takes Settings > Mic gain in FM too (`hal_radio_t.mic_gain`), and starts 5 dB (FM) and
   3 dB (digital) above the old fixed level.
 - Dual watch is on in the C4FM variant (Quick tile 7); the UI stack grows by 320 bytes and the RTOS heap by 2 KB.
+
+## ID database callers, mic compressor, side keys
+
+- The DMR ID database (the RadioID list the editor uploads, `dmr_iddb.h`): a DMR call shows the words after the
+  callsign (name, city) on a line of their own when no talker alias is shown (`radio_dmr_call_t.src_info`, from
+  find_name's lookup cache: no extra flash read). A P25 call shows the callsign for its unit ID where the database
+  knows it (amateur P25 uses DMR IDs); NXDN's own numbers are not in it.
+- Mic compressor (Settings > Talk & voice, `settings_t.mic_comp`, `ambeVoiceSetCompressor`): before the vocoder
+  (DMR, C4FM, NXDN). Off, Light (threshold -12 dBFS, 3:1, +5 dB) or Strong (-18 dBFS, 5:1, +9 dB); 5 ms attack,
+  150 ms release, a gate near -40 dBFS keeps the background where it was, a soft limit above -2.5 dBFS. FM keeps the
+  board's mic gain; with a board mic gain Mic AGC no longer overrides it.
+- Side keys (Settings > Keys): Tactical, Tactical tones, Roger on/off, APRS position, numbered 200-203 in the
+  codeplug's key slots so RadioFoundry's own later numbers never read as them.
+- APRS messaging and SmartBeaconing are RadioFoundry's (Tools > APRS, Calls > Messages, Settings > Location).

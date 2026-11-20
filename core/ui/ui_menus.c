@@ -6645,6 +6645,12 @@ static const int16_t v_keyfn_press[] = { KEYFN_DEFAULT, KEYFN_NONE, KEYFN_MONITO
 #if CONFIG_DUAL_WATCH
 					 KEYFN_AB, KEYFN_DUAL_WATCH,
 #endif
+#if CONFIG_C4FM
+					 KEYFN_TACTICAL, KEYFN_TAC_TONES, KEYFN_ROGER,
+#if CONFIG_APRS
+					 KEYFN_APRS_SEND,
+#endif
+#endif
 };
 static const tr_id_t n_keyfn_press[] = { TRN(VALUE_DEFAULT, "Default"), TRN(KEYFN_VALUE_NOTHING, "Nothing"),
 	TRN(KEYFN_VALUE_MONITOR, "Monitor"), TRN(KEYFN_VALUE_TALK_TARGET, "Talk target"),
@@ -6666,6 +6672,13 @@ static const tr_id_t n_keyfn_press[] = { TRN(VALUE_DEFAULT, "Default"), TRN(KEYF
 #if CONFIG_DUAL_WATCH
 					     TRX(KEYFN_VALUE_A_B, "A/B"), TRN(WORD_DUAL_WATCH, "Dual watch"),
 #endif
+#if CONFIG_C4FM
+					     TRN(KEYFN_VALUE_TACTICAL, "Tactical"), TRN(KEYFN_VALUE_TAC_TONES, "Tactical tones"),
+					     TRN(KEYFN_VALUE_ROGER, "Roger on/off"),
+#if CONFIG_APRS
+					     TRN(KEYFN_VALUE_APRS_SEND, "APRS position"),
+#endif
+#endif
 };
 static const int16_t v_keyfn_hold[] = { KEYFN_DEFAULT, KEYFN_NONE, KEYFN_TALK_TARGET, KEYFN_POWER, KEYFN_ZONE_UP,
 					KEYFN_ZONE_DOWN, KEYFN_SCAN,
@@ -6681,6 +6694,12 @@ static const int16_t v_keyfn_hold[] = { KEYFN_DEFAULT, KEYFN_NONE, KEYFN_TALK_TA
 #endif
 #if CONFIG_DUAL_WATCH
 					KEYFN_AB, KEYFN_DUAL_WATCH,
+#endif
+#if CONFIG_C4FM
+					 KEYFN_TACTICAL, KEYFN_TAC_TONES, KEYFN_ROGER,
+#if CONFIG_APRS
+					 KEYFN_APRS_SEND,
+#endif
 #endif
 };
 static const tr_id_t n_keyfn_hold[] = { TRN(VALUE_DEFAULT, "Default"), TRN(KEYFN_VALUE_NOTHING, "Nothing"),
@@ -6701,6 +6720,13 @@ static const tr_id_t n_keyfn_hold[] = { TRN(VALUE_DEFAULT, "Default"), TRN(KEYFN
 #endif
 #if CONFIG_DUAL_WATCH
 					    TRX(KEYFN_VALUE_A_B, "A/B"), TRN(WORD_DUAL_WATCH, "Dual watch"),
+#endif
+#if CONFIG_C4FM
+					     TRN(KEYFN_VALUE_TACTICAL, "Tactical"), TRN(KEYFN_VALUE_TAC_TONES, "Tactical tones"),
+					     TRN(KEYFN_VALUE_ROGER, "Roger on/off"),
+#if CONFIG_APRS
+					     TRN(KEYFN_VALUE_APRS_SEND, "APRS position"),
+#endif
 #endif
 };
 #endif
@@ -6999,6 +7025,8 @@ static const int16_t v_bcl[] = { RADIO_BCL_OFF, RADIO_BCL_CARRIER, RADIO_BCL_WRO
 static const tr_id_t n_bcl[] = { TRN(VALUE_OFF, "Off"), TRN(CARRIER, "Carrier"), TRN(WRONG_TONE, "Wrong tone") };
 // The roger sound, every mode (radio/roger_sound.h): Off, then the sounds in roger_sound_t order (value = sound + 1)
 static const int16_t v_roger[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+static const int16_t v_mic_comp[] = { 0, 1, 2 };
+static const tr_id_t n_mic_comp[] = { TRN(VALUE_OFF, "Off"), TRN(VALUE_LIGHT, "Light"), TRN(VALUE_STRONG, "Strong") };
 static const tr_id_t n_roger[] = { TRN(VALUE_OFF, "Off"), TRN(CLASSIC, "Classic"), TRN(BEEP, "Beep"), TRN(DOUBLE_BEEP, "Double beep"),
 	TRN(TWO_TONE_UP, "Two-tone up"), TRN(TWO_TONE_DOWN, "Two-tone down"), TRN(TRIPLE_CHIRP, "Triple chirp"), TRN(SWEEP_UP, "Sweep up"), TRN(SWEEP_DOWN, "Sweep down"),
 	TRN(BEE_BOO, "Bee-boo"), TRN(MORSE_K, "Morse K"), TRN(MORSE_R, "Morse R"), TRN(QUINDAR, "Quindar") };
@@ -7118,6 +7146,8 @@ static const set_item_t s_talk_voice[] = {
 	LIST(TRN(SET_LABEL_TX_TIMEOUT, "TX timeout"), "TOT", UI_SET_TOT_S, v_tot, n_tot),
 	NUMBER(TRN(SET_LABEL_MIC_GAIN, "Mic gain"), "microphone FM DMR C4FM loudness", UI_SET_MIC_GAIN, 0, 10, 1, NULL),
 	TOGGLE(TRN(SET_LABEL_MIC_AGC, "Mic AGC"), "automatic gain level DMR C4FM", UI_SET_MIC_AGC),
+	LIST(TRN(SET_LABEL_MIC_COMPRESSOR, "Mic compressor"), "compressor punch loudness DMR C4FM NXDN", UI_SET_MIC_COMP,
+	     v_mic_comp, n_mic_comp),
 	TOGGLE(TRN(SET_LABEL_MIC_NOISE_REDUCTION, "Mic noise reduction"), "noise suppression background DMR C4FM", UI_SET_NOISE_REDUCTION),
 	NUMBER(TRN(VOICE_VOLUME, "Voice volume"), "DMR C4FM digital decoded voice level", UI_SET_VOICE_RX_GAIN, -6, 12, 2, " dB"),
 };
@@ -7808,6 +7838,8 @@ static bool vocoder_has(uint32_t opt)
 // Mic AGC is on and in force: Mic gain doesn't apply (shown as "AGC", dimmed)
 static bool mic_agc_on(void)
 {
+	if (board.radio != NULL && board.radio->mic_gain != NULL)
+		return false;	// the board's own mic gain (FM and digital) stays in force with AGC
 	return vocoder_has(VOCODER_OPT_AGC) && ui_svc_setting_get(UI_SET_MIC_AGC) != 0;
 }
 

@@ -708,6 +708,26 @@ msgid "Talkgroup number first"
 msgstr "Numéro du TG d'abord"
 
 #: core/ui/ui_app.c
+msgctxt "KEY_TOAST_TACTICAL_ON"
+msgid "Tactical on"
+msgstr ""
+
+#: core/ui/ui_app.c
+msgctxt "KEY_TOAST_TACTICAL_OFF"
+msgid "Tactical off"
+msgstr ""
+
+#: core/ui/ui_app.c core/ui/ui_aprs.c
+msgctxt "APRS_TOAST_SENDING_POSITION"
+msgid "Sending position"
+msgstr "Envoi de la position"
+
+#: core/ui/ui_app.c core/ui/ui_aprs.c
+msgctxt "APRS_TOAST_CANT_SEND_NOW"
+msgid "Can't send now"
+msgstr "Envoi impossible"
+
+#: core/ui/ui_app.c
 msgctxt "HOME_TOAST_VOLUME_USE_KNOB"
 msgid "Volume: use the knob"
 msgstr "Volume : via bouton"
@@ -968,19 +988,9 @@ msgid "As channel"
 msgstr "Selon canal"
 
 #: core/ui/ui_aprs.c
-msgctxt "APRS_TOAST_SENDING_POSITION"
-msgid "Sending position"
-msgstr "Envoi de la position"
-
-#: core/ui/ui_aprs.c
 msgctxt "APRS_TOAST_SET_CALLSIGN_FIRST"
 msgid "Set your callsign first"
 msgstr "Fixer indicatif d'ab"
-
-#: core/ui/ui_aprs.c
-msgctxt "APRS_TOAST_CANT_SEND_NOW"
-msgid "Can't send now"
-msgstr "Envoi impossible"
 
 #: core/ui/ui_aprs.c
 msgctxt "APRS_TOAST_BEACONS_ON"
@@ -3752,6 +3762,26 @@ msgctxt "KEYFN_VALUE_TG_NAME_NUMBER"
 msgid "TG name / number"
 msgstr "Nom / numéro TG"
 
+#: core/ui/ui_menus.c
+msgctxt "KEYFN_VALUE_TACTICAL"
+msgid "Tactical"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "KEYFN_VALUE_TAC_TONES"
+msgid "Tactical tones"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "KEYFN_VALUE_ROGER"
+msgid "Roger on/off"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "KEYFN_VALUE_APRS_SEND"
+msgid "APRS position"
+msgstr ""
+
 #: core/ui/ui_menus.c core/ui/ui_screens.c
 msgctxt "TITLE_EMERGENCY"
 msgid "Emergency"
@@ -4173,6 +4203,16 @@ msgid "Wrong tone"
 msgstr ""
 
 #: core/ui/ui_menus.c
+msgctxt "VALUE_LIGHT"
+msgid "Light"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "VALUE_STRONG"
+msgid "Strong"
+msgstr ""
+
+#: core/ui/ui_menus.c
 msgctxt "CLASSIC"
 msgid "Classic"
 msgstr ""
@@ -4450,6 +4490,11 @@ msgstr ""
 #: core/ui/ui_menus.c
 msgctxt "LAST_HEARD_C4FM"
 msgid "Last heard C4FM"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_MIC_COMPRESSOR"
+msgid "Mic compressor"
 msgstr ""
 
 #: core/ui/ui_menus.c

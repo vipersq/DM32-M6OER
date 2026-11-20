@@ -473,6 +473,13 @@ KEYASSIGN_BOARDS := $(wildcard $(ROOT)/boards/*/board.c)
 keyassignTest: $(CORE)/input/input_forward.c $(CORE)/input/input_forward.h keyassignTest.c $(CORE)/input/keyassign.c $(CORE)/input/keyassign.h $(CORE)/input/input_engine.c $(KEYASSIGN_BOARDS)
 	$(CC) $(CFLAGS) $(CORE_HAL) '-DBOARD_IDS=$(foreach f,$(KEYASSIGN_BOARDS),"$(notdir $(patsubst %/,%,$(dir $(f))))",)' \
 		-o $@ keyassignTest.c $(CORE)/input/keyassign.c $(CORE)/input/input_engine.c $(CORE)/input/input_forward.c
+# The same in the C4FM build (the fork's side key functions)
+TESTS   += keyassignTestC4fm
+# It reads every board's board.c key map: BOARD_IDS lists them, from boards/ (a new board is checked with no edit here)
+KEYASSIGN_BOARDS := $(wildcard $(ROOT)/boards/*/board.c)
+keyassignTestC4fm: $(CORE)/input/input_forward.c $(CORE)/input/input_forward.h keyassignTest.c $(CORE)/input/keyassign.c $(CORE)/input/keyassign.h $(CORE)/input/input_engine.c $(KEYASSIGN_BOARDS)
+	$(CC) $(CFLAGS) $(CORE_HAL) '-DBOARD_IDS=$(foreach f,$(KEYASSIGN_BOARDS),"$(notdir $(patsubst %/,%,$(dir $(f))))",)' \
+		-DCONFIG_C4FM=1 -DCONFIG_APRS=1 -o $@ keyassignTest.c $(CORE)/input/keyassign.c $(CORE)/input/input_engine.c $(CORE)/input/input_forward.c
 
 # The rotary encoder's quadrature decoder (drivers/input/quadrature), shared by the boards
 quadratureTest: quadratureTest.c $(ROOT)/drivers/input/quadrature/quadrature.c $(ROOT)/drivers/input/quadrature/quadrature.h
@@ -506,7 +513,7 @@ boardBandTest: boardBandTest.c $(ROOT)/hal/board.h
 
 run: run-core
 run-core: radioCoreTest radioCoreTestRoger radioFeaturesTestRoger radioCoreTestNoVfoDmr radioCoreTestP25 radioCoreTestP25T radioCoreTestNxdn radioCoreTestP25Nxdn radioCoreTestAprs radioCoreTestAprsDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest inputTest switchFollowTest aprsRadioTest quadratureTest serialmicTest miclevelTest resampleTest \
-          rx2LinkTest keyassignTest powerSwitchTest powerKeyTest boardBandTest batteryTest
+          rx2LinkTest keyassignTest keyassignTestC4fm powerSwitchTest powerKeyTest boardBandTest batteryTest
 	./aprsRadioTest
 	./radioCoreTest
 	./radioCoreTestRoger
@@ -530,6 +537,7 @@ run-core: radioCoreTest radioCoreTestRoger radioFeaturesTestRoger radioCoreTestN
 	./resampleTest
 	./rx2LinkTest
 	./keyassignTest
+	./keyassignTestC4fm
 	./powerSwitchTest
 	./powerKeyTest
 	./boardBandTest

@@ -1399,8 +1399,10 @@ static void find_name(radio_sm_t *sm, uint32_t id, bool group, char *out)
 			return;
 		}
 	}
+	char *info = sm->lookup_info[sm->lookup_next];
 	radio_name_t *n = &sm->lookups[sm->lookup_next];
 	sm->lookup_next = (uint8_t)((sm->lookup_next + 1u) % RADIO_LOOKUPS);
+	info[0] = '\0';
 	n->id = id;
 	n->group = group;
 	n->name[0] = '\0';
@@ -1412,6 +1414,13 @@ static void find_name(radio_sm_t *sm, uint32_t id, bool group, char *out)
 		if (dmr_iddb_lookup(id, text, sizeof(text))) {
 			memcpy(n->name, text, CODEPLUG_NAME_LEN);
 			n->name[CODEPLUG_NAME_LEN] = '\0';
+			const char *p = strchr(text, ' ');	// what follows the callsign: name, city
+			while (p != NULL && *p == ' ')
+				p++;
+			if (p != NULL) {
+				strncpy(info, p, RADIO_SRC_INFO_MAX);
+				info[RADIO_SRC_INFO_MAX] = '\0';
+			}
 		}
 	}
 	memcpy(out, n->name, CODEPLUG_NAME_LEN + 1);
@@ -2239,6 +2248,15 @@ static void copy_call(radio_sm_t *sm, const dmr_caller_t *c, radio_dmr_call_t *o
 	out->pi_header = c->pi_header;
 	find_name(sm, c->src, false, out->src_name);
 	find_name(sm, c->dst, c->group, out->dst_name);
+	// The caller's name and city from the DMR ID database ("M0ABC Dave Bristol": what follows the callsign), from
+	// find_name's lookup cache
+	out->src_info[0] = '\0';
+	for (uint8_t i = 0; i < RADIO_LOOKUPS && c->src != 0; i++) {
+		if (sm->lookups[i].id == c->src && !sm->lookups[i].group) {
+			memcpy(out->src_info, sm->lookup_info[i], sizeof out->src_info);
+			break;
+		}
+	}
 	out->gps_valid = false;
 	out->gps_range = false;
 #if !CONFIG_DMR_GPS
@@ -7596,6 +7614,7 @@ static void apply_prefs(radio_sm_t *sm, const settings_t *st)
 		board.c4fm->set_tx_level(lvl == 0 ? 100u : lvl < 70u ? 70u : lvl > 130u ? 130u : lvl);	// next key-up
 	}
 	ambeVoiceSetRxGain(st->voice_rx_gain);
+	ambeVoiceSetCompressor(st->mic_comp);
 	if (sm->c4fm_running) {
 		c4fm_configure(sm);
 		changed(sm);

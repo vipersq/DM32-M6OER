@@ -23,6 +23,9 @@ static const uint8_t fn_action[KEYFN_COUNT] = {
 
 bool keyassign_allowed(uint8_t fn, bool hold)
 {
+	if (fn >= KEYFN_TACTICAL && fn <= KEYFN_APRS_SEND) {
+		return CONFIG_C4FM && (fn != KEYFN_APRS_SEND || CONFIG_APRS);	// the fork's: a press or a long press
+	}
 	if (fn >= KEYFN_COUNT) {
 		return false;
 	}
@@ -34,6 +37,7 @@ bool keyassign_allowed(uint8_t fn, bool hold)
 		return false;
 	}
 #endif
+
 	return hold ? fn != KEYFN_MONITOR && fn != KEYFN_TONE_BURST : fn != KEYFN_EMERGENCY;
 }
 
@@ -47,6 +51,10 @@ bool keyassign_home_allowed(uint8_t fn, bool hold)
 
 uint8_t keyassign_action(uint8_t fn)
 {
+	if (CONFIG_C4FM && fn >= KEYFN_TACTICAL && fn <= KEYFN_APRS_SEND) {
+		static const uint8_t fork_action[] = { ACT_TACTICAL, ACT_TAC_TONES, ACT_ROGER, ACT_APRS_SEND };
+		return fork_action[fn - KEYFN_TACTICAL];
+	}
 	return fn < KEYFN_COUNT ? fn_action[fn] : (uint8_t)ACT_NONE;
 }
 
@@ -63,7 +71,7 @@ uint8_t keyassign_get(const uint16_t slots[KEYASSIGN_SLOTS], uint8_t role, bool 
 	} else {
 		return KEYFN_DEFAULT;
 	}
-	return v < KEYFN_COUNT && keyassign_allowed((uint8_t)v, hold) ? (uint8_t)v : KEYFN_DEFAULT;
+	return v <= 0xFFu && keyassign_allowed((uint8_t)v, hold) ? (uint8_t)v : KEYFN_DEFAULT;
 }
 
 void keyassign_set(uint16_t slots[KEYASSIGN_SLOTS], uint8_t role, bool hold, uint8_t fn)

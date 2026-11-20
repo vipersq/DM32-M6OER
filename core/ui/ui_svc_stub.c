@@ -148,6 +148,13 @@ WEAK int32_t ui_svc_fm_get(uint8_t id) { return ui_svc_ram_get(id); }
 WEAK void ui_svc_fm_set(uint8_t id, int32_t value) { (void)ui_svc_ram_set(id, value); }
 static uint32_t stub_rx_tg;
 WEAK uint32_t ui_svc_dmr_rx_tg(void) { return stub_rx_tg; }
+WEAK bool ui_svc_id_lookup(uint32_t id, char *out, size_t len)
+{
+	(void)id;
+	if (len > 0)
+		out[0] = '\0';
+	return false;
+}
 WEAK void ui_svc_dmr_set_rx_tg(uint32_t tg) { stub_rx_tg = tg & 0xFFFFFFu; }
 WEAK void ui_svc_c4fm_call_get(char *out, uint8_t len) { if (len > 0) out[0] = '\0'; }
 WEAK void ui_svc_c4fm_call_set(const char *call) { (void)call; }

@@ -44,6 +44,13 @@ typedef enum {
 	KEYFN_COUNT
 } keyfn_t;
 
+// The C4FM fork's functions (CONFIG_C4FM), far above RadioFoundry's so a number it adds later never reads as one of
+// them: the red tactical screen, the tactical tones, the roger sound on / off, an APRS position now (CONFIG_APRS)
+#define KEYFN_TACTICAL		200u
+#define KEYFN_TAC_TONES		201u
+#define KEYFN_ROGER		202u
+#define KEYFN_APRS_SEND		203u
+
 // fn may go in a press (hold false) or long press slot
 bool keyassign_allowed(uint8_t fn, bool hold);
 // The same for a home key (board.home_keys): its arrow sends a press and a long press, never raw edges, so the

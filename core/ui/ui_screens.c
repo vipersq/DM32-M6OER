@@ -2051,6 +2051,8 @@ static void draw_dmr_call(const radio_view_t *v, const ui_state_t *s)
 	if (d->call.emergency)
 		sb_str(&b, TR(CALL_CHIP_EMERGENCY, " EMERGENCY"));
 	y = call_line(L->small, y, buf, d->call.emergency ? ui_col.warn : ui_col.dim);
+	if (d->call.src_info[0] != '\0' && !(d->alias[0] != '\0' && s->alias_show))
+		y = call_line(L->small, y, d->call.src_info, ui_col.fg);	// name and city, from the ID database
 	if (d->alias[0] != '\0' && s->alias_show) {
 		// The talker alias in quotes, on two lines when it needs them and they fit above the signal line
 		char lines[2][64];
@@ -2104,6 +2106,7 @@ static void draw_dmr_call(const radio_view_t *v, const ui_state_t *s)
 // A P25 or NXDN call coming in (air_call): whether one is heard now, and its fields
 typedef struct {
 	bool played, enc, unit;
+	bool p25;		// a P25 unit ID (the DMR ID database may know it), else NXDN's own numbers
 	uint32_t src, dst;
 } air_call_t;
 
@@ -2115,6 +2118,7 @@ static bool air_call(const radio_view_t *v, air_call_t *c)
 		c->played = (p->flags & RADIO_P25_PLAYED) != 0;
 		c->enc = (p->flags & RADIO_P25_ENC) != 0;
 		c->unit = (p->flags & RADIO_P25_UNIT) != 0;
+		c->p25 = true;
 		c->src = p->src;
 		c->dst = p->dst;
 		return true;
@@ -2126,6 +2130,7 @@ static bool air_call(const radio_view_t *v, air_call_t *c)
 		c->played = (n->flags & RADIO_NXDN_PLAYED) != 0;
 		c->enc = (n->flags & RADIO_NXDN_ENC) != 0;
 		c->unit = (n->flags & RADIO_NXDN_UNIT) != 0;
+		c->p25 = false;
 		c->src = n->src;
 		c->dst = n->dst;
 		return true;
@@ -2155,9 +2160,31 @@ static void air_call_line(const air_call_t *c, const font_t *f, int y)
 		if (c->enc)
 			sb_str(&b, "ENC ");
 		if (with_id) {
-			sb_str(&b, "ID ");
-			sb_u32(&b, c->src, 1);
-			sb_str(&b, " " GLYPH_ARROW " ");
+#if CONFIG_DMR && CONFIG_C4FM
+			// P25 unit IDs on the amateur bands are mostly DMR IDs: the ID database's callsign when it has one
+			static uint32_t known_id;
+			static char known[12];
+			if (c->src != known_id) {
+				char text[49];
+				known_id = c->src;
+				known[0] = '\0';
+				if (c->p25 && ui_svc_id_lookup(c->src, text, sizeof text)) {
+					char *sp = strchr(text, ' ');
+					if (sp != NULL)
+						*sp = '\0';
+					str_copy(known, sizeof known, text);
+				}
+			}
+			if (known[0] != '\0' && with_id == 1) {
+				sb_str(&b, known);
+				sb_str(&b, " " GLYPH_ARROW " ");
+			} else
+#endif
+			{
+				sb_str(&b, "ID ");
+				sb_u32(&b, c->src, 1);
+				sb_str(&b, " " GLYPH_ARROW " ");
+			}
 		}
 		if (c->unit) {
 			sb_str(&b, TR(CALL_VALUE_PRIVATE_TO, "Private to "));

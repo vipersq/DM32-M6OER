@@ -6,6 +6,7 @@
 // These are the strong definitions; ui_svc_stub.c keeps the weak ones for what other packages still have to provide.
 #include "ui_svc.h"
 #include "board.h"
+#include "codeplug/dmr_iddb.h"
 #include "radio/radio.h"
 #include "radio/beep.h"
 #include "radio/vibe.h"
@@ -127,6 +128,11 @@ void ui_svc_fm_set(uint8_t id, int32_t value)
 		}
 	}
 	rs_send(&was);
+}
+
+bool ui_svc_id_lookup(uint32_t id, char *out, size_t len)
+{
+	return dmr_iddb_lookup(id, out, len);
 }
 
 uint32_t ui_svc_dmr_rx_tg(void)
@@ -488,7 +494,8 @@ int32_t ui_svc_reply_shown(const radio_settings_t *s)
 // dimmed)
 static void apply_mic_gain(int32_t step, bool agc)
 {
-	if (CONFIG_DMR && agc) {
+	// AGC sets DMR's sample scaling; a board with its own mic gain (FM too) keeps the setting
+	if (CONFIG_DMR && agc && (board.radio == NULL || board.radio->mic_gain == NULL)) {
 		step = (int32_t)MIC_GAIN_UNITY;
 	} else if (step < 0) {
 		step = 0;

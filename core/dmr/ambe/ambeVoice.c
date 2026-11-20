@@ -60,6 +60,7 @@ static uint8_t cb_bad_run;
 static uint16_t rx_prime_wait_ms;	// ambeVoiceSetRxPrimeWait
 static uint16_t cb_prime_wait;		// blocks the call's first frame has waited, before playback starts
 static uint16_t rx_gain_q8 = 256;	// ambeVoiceSetRxGain: the decoded voice times this / 256
+static uint8_t comp_level;		// ambeVoiceSetCompressor: 0 off, 1 light, 2 strong
 #if !CONFIG_SIG_TONES
 // The roger sound in place of the mic (ambeVoiceRogerTone): tone_req = sound + 1 asked for, 0xFF cancel; tone_busy
 // while the callback plays it. The generator is the audio callback's only
@@ -569,6 +570,46 @@ static void mic_stats(const int16_t *mic)
 	stats.tx_mic_zc = 8u * hist_at(mic_zc_hist, MIC_ZC_BINS, n, 500u) + 4u;
 }
 
+// The mic compressor (ambeVoiceSetCompressor): an envelope follower (5 ms attack, 150 ms release), above the
+// threshold the level rises 1/ratio as fast, then makeup gain; below the gate (about -40 dBFS) the gain eases back to
+// unity so the background isn't raised between words; a soft limit at the end. The callback's only
+static const struct {
+	int32_t thr, ratio, makeup_q8;
+} comp_cfg[3] = { { 0, 1, 256 }, { 8192, 3, 448 }, { 4096, 5, 704 } };	// off, light (+5 dB), strong (+9 dB)
+static int32_t comp_env;		// |x| envelope, Q0
+static int32_t comp_gain_q8 = 256;	// the gain in force, eased toward the target
+
+static void compress(int16_t *x, int n, uint8_t level)
+{
+	if (level > 2)
+		level = 2;
+	const int32_t thr = comp_cfg[level].thr, ratio = comp_cfg[level].ratio, mk = comp_cfg[level].makeup_q8;
+	for (int i = 0; i < n; i++) {
+		int32_t a = x[i] < 0 ? -(int32_t)x[i] : x[i];
+		if (a > comp_env)
+			comp_env += (a - comp_env) / 40 + 1;
+		else if (comp_env > a)
+			comp_env -= (comp_env - a) / 1200 + 1;
+		int32_t target;
+		if (comp_env < 320) {
+			target = 256;	// the gate: speech pauses keep the background where it was
+		} else if (comp_env <= thr) {
+			target = mk;
+		} else {
+			int32_t out = thr + (comp_env - thr) / ratio;
+			target = (int32_t)(((int64_t)mk * out) / comp_env);
+		}
+		comp_gain_q8 += (target - comp_gain_q8) / 64;
+		int32_t v = (x[i] * comp_gain_q8) / 256;
+		// soft limit above 3/4 of full scale: the excess at a quarter, then the hard edge
+		if (v > 24576)
+			v = 24576 + (v - 24576) / 4;
+		else if (v < -24576)
+			v = -24576 + (v + 24576) / 4;
+		x[i] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
+	}
+}
+
 static void tx_block(const int16_t *mic)
 {
 	uint8_t seq = LOAD(tx_seq);
@@ -660,6 +701,13 @@ static void tx_block(const int16_t *mic)
 		}
 		mic = scaled;
 	}
+	if (!tone && LOAD(comp_level) != 0) {
+		if (mic != scaled) {
+			memcpy(scaled, mic, sizeof scaled);
+			mic = scaled;
+		}
+		compress(scaled, AUDIO_BLOCK_SAMPLES, LOAD(comp_level));
+	}
 #if CONFIG_SIG_TONES
 	// The tone's last block: tone_active stays set until its frame is queued and tone_last_* published below, so
 	// source_busy() never reads false with the end tone's frames still to go. A full queue drops this frame and the
@@ -745,6 +793,11 @@ void ambeVoiceSetRxGain(int8_t db)
 	static const uint16_t q8[10] = { 128, 161, 203, 256, 322, 406, 511, 643, 810, 1020 };	// -6 .. +12 dB
 	int i = (db < -6 ? -6 : db > 12 ? 12 : db) / 2 + 3;
 	STORE(rx_gain_q8, q8[i]);
+}
+
+void ambeVoiceSetCompressor(uint8_t level)
+{
+	STORE(comp_level, (uint8_t)(level > 2 ? 2 : level));
 }
 
 void ambeVoiceSetRxPrimeWait(uint16_t ms)

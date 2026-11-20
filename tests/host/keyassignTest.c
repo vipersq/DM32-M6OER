@@ -4,6 +4,7 @@
 // what each slot may hold, and the key map built from them, run through the gesture engine
 #include <stdio.h>
 #include <string.h>
+#include "config.h"
 #include "input/keyassign.h"
 #include "input/input_engine.h"
 #include "input/input_forward.h"
@@ -146,6 +147,22 @@ static void test_build(void)
 }
 
 // The functions of side key actions 11 (hear all, monitor latch, key lock, call back, home zone)
+// The C4FM fork's functions: numbers 200-203, kept in a slot like the others, each sending its own action
+static void test_fork_functions(void)
+{
+	static const uint8_t fn[] = { KEYFN_TACTICAL, KEYFN_TAC_TONES, KEYFN_ROGER, KEYFN_APRS_SEND };
+	static const uint8_t act[] = { ACT_TACTICAL, ACT_TAC_TONES, ACT_ROGER, ACT_APRS_SEND };
+	for (unsigned i = 0; i < 4; i++) {
+		uint16_t s[KEYASSIGN_SLOTS] = { 0 };
+		bool on = CONFIG_C4FM && (fn[i] != KEYFN_APRS_SEND || CONFIG_APRS);
+		CHECK(keyassign_allowed(fn[i], false) == on && keyassign_allowed(fn[i], true) == on);
+		keyassign_set(s, 1, true, fn[i]);
+		CHECK(keyassign_get(s, 1, true) == (on ? fn[i] : KEYFN_DEFAULT));
+		CHECK(keyassign_action(fn[i]) == (on ? act[i] : ACT_NONE));
+	}
+	CHECK(!keyassign_allowed(KEYFN_COUNT, false) && !keyassign_allowed(199, true) && !keyassign_allowed(204, true));
+}
+
 static void test_toggles(void)
 {
 	static const struct { uint8_t fn; uint8_t value; uint8_t action; } t[] = {
@@ -406,6 +423,7 @@ int main(void)
 	test_allowed();
 	test_build();
 	test_toggles();
+	test_fork_functions();
 	test_engine();
 	test_burst_edges();
 	test_burst_lock();

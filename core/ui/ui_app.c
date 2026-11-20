@@ -1448,6 +1448,8 @@ static void quick_unavailable(uint8_t kind)
 	}
 }
 
+static void quick_do(uint8_t kind);
+
 static void quick_activate(int tile)
 {
 	char label[20], value[12];
@@ -1457,6 +1459,12 @@ static void quick_activate(int tile)
 		quick_unavailable(kind);
 		return;
 	}
+	quick_do(kind);
+}
+
+// What a tile does (also a side key's function, through the same kind)
+static void quick_do(uint8_t kind)
+{
 	switch (kind) {
 	case QT_BANDWIDTH: {
 		bool wide = view->ch.bw != RADIO_BW_25K;
@@ -2340,6 +2348,25 @@ void ui_app_key(const input_event_t *ev)
 			ui_toast(ui_st.label_first ? TR(SET_LABEL_TG_NAME_FIRST, "Talkgroup name first") :
 				TR(HOME_TOAST_TG_NUMBER_FIRST, "Talkgroup number first"));
 			return;
+#endif
+#if CONFIG_C4FM
+		case ACT_TACTICAL:
+			quick_set(UI_SET_TAC_MODE, !ui_svc_setting_get(UI_SET_TAC_MODE));
+			ui_toast(ui_svc_setting_get(UI_SET_TAC_MODE) ? TR(KEY_TOAST_TACTICAL_ON, "Tactical on") :
+				TR(KEY_TOAST_TACTICAL_OFF, "Tactical off"));
+			return;
+		case ACT_TAC_TONES:
+			quick_do(QT_TONES);
+			return;
+		case ACT_ROGER:
+			quick_do(QT_ROGER);
+			return;
+#if CONFIG_APRS
+		case ACT_APRS_SEND:
+			ui_toast(ui_svc_aprs_send_now() ? TR(APRS_TOAST_SENDING_POSITION, "Sending position") :
+				TR(APRS_TOAST_CANT_SEND_NOW, "Can't send now"));
+			return;
+#endif
 #endif
 		case ACT_VOLUME:
 			if (!(ui_svc_features() & UI_FEAT_VOLUME))

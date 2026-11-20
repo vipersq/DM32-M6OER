@@ -3094,6 +3094,7 @@ static void test_dmr_voice_features(void)
 	run(2000);
 	hear_call(true, 201, 9995555, 2, 1, true);
 	CHECK(contact_finds == finds && iddb_lookups == looks);
+	CHECK(strncmp(d->last.src_info, "Robert", 6) == 0);	// the ID database's words after the callsign
 	// Back to the channel's target
 	req(RREQ_DMR_TARGET_CLEAR, 0);
 	run(20);

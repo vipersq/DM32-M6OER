@@ -464,6 +464,7 @@ typedef enum {
 	UI_SET_DMR_BOTH_TS,
 	UI_SET_DMR_ANY_TG,
 	UI_SET_DMR_ANY_CC,
+	UI_SET_MIC_COMP,	// the mic compressor (DMR, C4FM, NXDN): 0 off, 1 light, 2 strong
 	UI_SET_COUNT
 } ui_setting_t;
 
@@ -498,6 +499,8 @@ void ui_svc_fm_set(uint8_t id, int32_t value);
 void ui_svc_c4fm_call_get(char *out, uint8_t len);
 // The extra DMR RX talkgroup (radio_settings_t.dmr_rx_tg), 0 = none; heard on every DMR channel
 uint32_t ui_svc_dmr_rx_tg(void);
+// The DMR ID database's text for an ID ("callsign name city"), false if not in it (or no database)
+bool ui_svc_id_lookup(uint32_t id, char *out, size_t len);
 void ui_svc_dmr_set_rx_tg(uint32_t tg);
 void ui_svc_c4fm_call_set(const char *call);
 #endif

@@ -141,6 +141,7 @@ typedef enum { RADIO_BATT_OK, RADIO_BATT_LOW, RADIO_BATT_CRITICAL } radio_batt_t
 
 #if CONFIG_DMR
 #define RADIO_ALIAS_MAX		31	// talker alias characters (DMR_TA_TEXT_MAX)
+#define RADIO_SRC_INFO_MAX	27	// radio_dmr_call_t.src_info characters
 
 // What the DMR side is doing, for the screens
 typedef enum {
@@ -163,6 +164,7 @@ typedef struct {
 	bool pi_header;		// a PI header was heard (an MI-based scheme: we can't decrypt it)
 	char src_name[CODEPLUG_NAME_LEN + 1];	// codeplug contact, else the DMR ID database's text cut short, "" if unknown
 	char dst_name[CODEPLUG_NAME_LEN + 1];	// talkgroup name, "" if unknown
+	char src_info[RADIO_SRC_INFO_MAX + 1];	// the DMR ID database's words after the callsign (name, city), "" none
 	// The caller's position from an ETSI GPS Info LC (CONFIG_DMR_GPS, docs/spec/dmr-voice.md)
 	bool gps_valid;
 	uint8_t gps_err;	// position error code: 0 < 2 m, 1 < 20 m ... 5 <= 200 km, 6 more, 7 unknown

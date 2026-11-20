@@ -461,6 +461,7 @@ typedef struct {
 	radio_name_t names[RADIO_NAMES_MAX];
 	uint8_t name_count;
 	radio_name_t lookups[RADIO_LOOKUPS];	// cache of codeplug_contact_find / dmr_iddb_lookup answers ("" = none)
+	char lookup_info[RADIO_LOOKUPS][RADIO_SRC_INFO_MAX + 1];	// lookups[i]'s name and city from the ID database
 	uint8_t lookup_next;
 	// A talk target chosen for now (RREQ_DMR_TARGET / _CONTACT / _CALL_BACK), on channel manual_ch
 	bool manual;

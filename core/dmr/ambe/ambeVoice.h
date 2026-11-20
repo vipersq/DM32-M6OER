@@ -94,6 +94,8 @@ void ambeVoiceSetRxGain(int8_t db);
 // hands its frames over in bursts at an uneven time: C4FM delivers five frames per 100 ms frame, when a poll (every
 // 25 ms) reads the frame's end, and playing them on arrival left the queue empty whenever the next burst came a poll
 // late (an underrun: a repeated 20 ms). Rounded up to audio blocks. Any task; read at each call's start
+// The mic compressor before the vocoder (DMR, C4FM, NXDN): 0 off, 1 light, 2 strong. Any task
+void ambeVoiceSetCompressor(uint8_t level);
 void ambeVoiceSetRxPrimeWait(uint16_t ms);
 // Test signal for DMR transmissions (the debug link's RADIO op 33, RAM only): on, the encoder gets a generated tone
 // that changes pitch every 60 ms in place of the mic, so an over carries known, varying audio whatever the mic hears

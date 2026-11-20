@@ -26,6 +26,9 @@ typedef enum {
 	ACT_AB,			// dual watch: the other channel (A / B); starts dual watch when it is off
 	ACT_TONE_BURST,		// FM repeater access: raw down / up edges
 	ACT_TALK_LABEL,		// Home's talk line: the talkgroup's name or its number first (a side key function)
+	// The C4FM build's side key functions: the red tactical screen, the tactical tones, the roger sound, an APRS
+	// position now (each on / off, a toast says which)
+	ACT_TACTICAL, ACT_TAC_TONES, ACT_ROGER, ACT_APRS_SEND,
 	// A home key with a function set (board.home_keys, keyassign.h): the UI turns it into that function on Home and
 	// back into the key's own action elsewhere. The gesture says press or long press
 	ACT_HOME_KEY_1, ACT_HOME_KEY_2, ACT_HOME_KEY_3, ACT_HOME_KEY_4,
