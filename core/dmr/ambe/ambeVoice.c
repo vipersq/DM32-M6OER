@@ -67,6 +67,7 @@ static uint8_t comp_level;		// ambeVoiceSetCompressor: 0 off, 1 light, 2 strong
 static uint8_t tone_req;
 static bool tone_busy;
 static roger_gen_t tone_gen;
+static uint8_t tone_level;	// ambeVoiceRogerTone's, read with the request
 #endif
 static uint32_t cb_call_frames;		// frames played in this call (rx_underrun_at)
 static uint8_t last_bits[VOCODER_BITS];
@@ -678,7 +679,7 @@ static void tx_block(const int16_t *mic)
 		if (req == 0xFF) {
 			tone_gen.on = false;
 		} else {
-			roger_gen_start(&tone_gen, (uint8_t)(req - 1u));
+			roger_gen_start(&tone_gen, (uint8_t)(req - 1u), LOAD(tone_level));
 		}
 	}
 	if (tone_gen.on) {
@@ -908,8 +909,9 @@ bool ambeVoiceTestSignal(void)
 }
 
 #if !CONFIG_SIG_TONES
-void ambeVoiceRogerTone(uint8_t sound)
+void ambeVoiceRogerTone(uint8_t sound, uint8_t level)
 {
+	STORE(tone_level, level);
 	STORE(tone_busy, true);	// busy from the request: the radio core waits for the callback to take it
 	STORE(tone_req, (uint8_t)(sound + 1u));
 }

@@ -6419,6 +6419,16 @@ static void roger_cancel(radio_sm_t *sm)
 	}
 }
 #else
+// The roger sound's deviation on FM (hal_radio_t.tx_tone_level): level 1-10 of twice the default's, so 5 is half the
+// board's tone level; 100 % again after it
+static void roger_level(const radio_sm_t *sm, bool on)
+{
+	if (board.radio->tx_tone_level == NULL)
+		return;
+	uint8_t lvl = sm->set.roger_level >= 1u && sm->set.roger_level <= 10u ? sm->set.roger_level : ROGER_LEVEL_DEFAULT;
+	board.radio->tx_tone_level(on ? (uint8_t)(lvl * 10u) : 100u);
+}
+
 // The roger sound's steps on the carrier, then its end (every poll while it runs; the steps are on the poll's grid)
 static void roger_poll(radio_sm_t *sm, uint32_t now_ms)
 {
@@ -6434,6 +6444,7 @@ static void roger_poll(radio_sm_t *sm, uint32_t now_ms)
 		if (t < roger_length_ms(sm->roger_snd) + (uint32_t)sm->set.roger_tail * ROGER_GRID_MS) {
 			return;
 		}
+		roger_level(sm, false);
 		sm->roger_ms = 0;
 		sm->view.roger = false;
 		fm_unkey(sm, false, now_ms);
@@ -6448,6 +6459,7 @@ static void roger_poll(radio_sm_t *sm, uint32_t now_ms)
 // The first step of the roger sound on the carrier; false when the board can't send tones
 static bool roger_start(radio_sm_t *sm)
 {
+	roger_level(sm, true);
 	const roger_step_t *st;
 	sm->roger_snd = sm->set.roger_sound < ROGER_COUNT ? sm->set.roger_sound : ROGER_CLASSIC;
 	(void)roger_steps(sm->roger_snd, &st);
@@ -6459,6 +6471,7 @@ static void roger_cancel(radio_sm_t *sm)
 {
 	if (sm->roger_ms != 0) {
 		tx_tone(0);
+		roger_level(sm, false);
 		sm->roger_ms = 0;
 		sm->view.roger = false;
 		changed(sm);
@@ -7135,7 +7148,7 @@ static void ptt_release(radio_sm_t *sm, bool roger, uint32_t now_ms)
 	// is out (dig_roger_poll), then the release below runs as usual
 	if (roger && sm->set.roger_beep && roger_here(sm) && sm->view.state == RS_TX &&
 	    (sm->dmr_running || DIG_C4FM(sm))) {
-		ambeVoiceRogerTone(sm->set.roger_sound < ROGER_COUNT ? sm->set.roger_sound : ROGER_CLASSIC);
+		ambeVoiceRogerTone(sm->set.roger_sound < ROGER_COUNT ? sm->set.roger_sound : ROGER_CLASSIC, sm->set.roger_level);
 		sm->dig_roger = true;
 		sm->dig_roger_ms = now_ms;
 		sm->dig_roger_done_ms = 0;
@@ -8043,6 +8056,7 @@ static void settings_to_radio(const settings_t *st, radio_settings_t *s)
 	s->roger_beep = (st->rs_flags & SETTINGS_RS_ROGER_BEEP) != 0;
 	s->roger_sound = st->roger_sound < ROGER_COUNT ? st->roger_sound : 0;
 	s->roger_tail = st->roger_tail <= 20u ? st->roger_tail : 6u;
+	s->roger_level = st->roger_level >= 1u && st->roger_level <= 10u ? st->roger_level : ROGER_LEVEL_DEFAULT;
 	s->tac_level = st->tac_level >= 1u && st->tac_level <= 10u ? st->tac_level : 10u;
 	s->tac_count = st->tac_count;
 	s->tac_key = (st->tac_flags & SETTINGS_TAC_KEY) != 0;
@@ -8086,6 +8100,7 @@ static void radio_to_settings(const radio_settings_t *s, uint32_t now_ms)
 	st->rs_bcl = s->bcl;
 	st->roger_sound = s->roger_sound;
 	st->roger_tail = s->roger_tail;
+	st->roger_level = s->roger_level;
 	st->tac_level = s->tac_level;
 	st->tac_count = s->tac_count;
 	st->tac_flags = (uint8_t)((s->tac_key ? SETTINGS_TAC_KEY : 0) | (s->tac_unkey ? SETTINGS_TAC_UNKEY : 0) |

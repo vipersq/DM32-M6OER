@@ -2971,7 +2971,21 @@ static void test_roger_sounds(void)
 	roger_gen_t g;
 	int16_t blk[160];
 	unsigned blocks = 0, loud = 0;
-	roger_gen_start(&g, ROGER_MORSE_K);
+	{	// the level: 10 is twice the default's peak, 1 a fifth of it
+		roger_gen_t a, b;
+		int16_t pa[160], pb[160];
+		int32_t ma = 0, mb = 0;
+		roger_gen_start(&a, ROGER_BEEP, ROGER_LEVEL_DEFAULT);
+		roger_gen_start(&b, ROGER_BEEP, 10);
+		(void)roger_gen_block(&a, pa, 160);
+		(void)roger_gen_block(&b, pb, 160);
+		for (int i = 0; i < 160; i++) {
+			ma = pa[i] > ma ? pa[i] : ma;
+			mb = pb[i] > mb ? pb[i] : mb;
+		}
+		CHECK(ma > 6000 && ma < 6600 && mb > 2 * ma - 50 && mb < 2 * ma + 50);
+	}
+	roger_gen_start(&g, ROGER_MORSE_K, ROGER_LEVEL_DEFAULT);
 	while (roger_gen_block(&g, blk, 160) && blocks < 100) {
 		int peak = 0;
 		for (int k = 0; k < 160; k++) {

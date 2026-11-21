@@ -276,7 +276,7 @@ typedef struct {
 	uint8_t roger_tail;		// carrier kept after the roger sound, in 25 ms (0-20)
 	uint8_t tac_level;		// the tactical tones' volume, 1-10 of the beep level
 	uint8_t tac_count;		// how many times each tactical tone plays, less one, 2 bits each: key, unkey, RX, RX end
-	uint8_t reserved_rt;		// 0
+	uint8_t roger_level;		// the roger sound's loudness 1-10 (0: the default, 5)
 } settings_t;
 
 // Pages: settings_t is stored as records of SETTINGS_PAGE_BYTES each (settings-store.md 2.1). Only the pages its size

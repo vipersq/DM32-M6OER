@@ -52,7 +52,7 @@ int32_t ui_modes_setting_get(uint8_t id)
 	case UI_SET_TONES_FM: case UI_SET_TONES_DMR: case UI_SET_TONES_C4FM: case UI_SET_TONES_P25: case UI_SET_TONES_NXDN:
 	case UI_SET_ROGER_FM: case UI_SET_ROGER_DMR: case UI_SET_ROGER_C4FM:
 	case UI_SET_DMR_BOTH_TS: case UI_SET_DMR_ANY_TG: case UI_SET_DMR_ANY_CC:
-	case UI_SET_ROGER_TAIL: case UI_SET_TAC_LEVEL:
+	case UI_SET_ROGER_TAIL: case UI_SET_TAC_LEVEL: case UI_SET_ROGER_LEVEL:
 	case UI_SET_TAC_N_KEY: case UI_SET_TAC_N_UNKEY: case UI_SET_TAC_N_RX: case UI_SET_TAC_N_RXEND:
 		return ui_svc_fm_get(id);
 	case UI_SET_CH_WIDE:
@@ -83,7 +83,7 @@ bool ui_modes_setting_set(uint8_t id, int32_t value)
 	case UI_SET_TONES_FM: case UI_SET_TONES_DMR: case UI_SET_TONES_C4FM: case UI_SET_TONES_P25: case UI_SET_TONES_NXDN:
 	case UI_SET_ROGER_FM: case UI_SET_ROGER_DMR: case UI_SET_ROGER_C4FM:
 	case UI_SET_DMR_BOTH_TS: case UI_SET_DMR_ANY_TG: case UI_SET_DMR_ANY_CC:
-	case UI_SET_ROGER_TAIL: case UI_SET_TAC_LEVEL:
+	case UI_SET_ROGER_TAIL: case UI_SET_TAC_LEVEL: case UI_SET_ROGER_LEVEL:
 	case UI_SET_TAC_N_KEY: case UI_SET_TAC_N_UNKEY: case UI_SET_TAC_N_RX: case UI_SET_TAC_N_RXEND:
 		ui_svc_fm_set(id, value);
 		return true;

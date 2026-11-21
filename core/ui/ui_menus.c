@@ -7114,6 +7114,7 @@ static const set_item_t s_tones[] = {
 #if CONFIG_FM_TX_TONES
 	LIST(TRN(ROGER_SOUND, "Roger sound"), "roger beep end of transmission tone FM DMR C4FM", UI_SET_FM_ROGER, v_roger, n_roger),
 #endif
+	NUMBER(TRN(ROGER_VOLUME, "Roger volume"), "roger beep loudness level quieter deviation", UI_SET_ROGER_LEVEL, 1, 10, 1, NULL),
 	LIST(TRN(ROGER_TAIL, "Roger tail"), "roger beep hang carrier after delay end", UI_SET_ROGER_TAIL, v_roger_tail,
 	     n_roger_tail),
 	TOGGLE(TRN(ROGER_IN_FM, "Roger in FM"), "roger beep per mode analog", UI_SET_ROGER_FM),

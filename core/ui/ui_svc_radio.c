@@ -92,6 +92,7 @@ int32_t ui_svc_fm_get(uint8_t id)
 		return (s->roger_off & (1u << ui_tone_id_mode(id))) == 0;
 	case UI_SET_DMR_BOTH_TS: return (s->dmr_rx & RADIO_DMR_RX_BOTH_TS) != 0;
 	case UI_SET_ROGER_TAIL: return s->roger_tail;
+	case UI_SET_ROGER_LEVEL: return s->roger_level >= 1u && s->roger_level <= 10u ? s->roger_level : 5;	// ROGER_LEVEL_DEFAULT
 	case UI_SET_TAC_LEVEL: return s->tac_level >= 1u && s->tac_level <= 10u ? s->tac_level : 10;
 	case UI_SET_TAC_N_KEY: case UI_SET_TAC_N_UNKEY: case UI_SET_TAC_N_RX: case UI_SET_TAC_N_RXEND:
 		return (int32_t)((s->tac_count >> (2u * (id - UI_SET_TAC_N_KEY))) & 3u) + 1;
@@ -112,6 +113,8 @@ void ui_svc_fm_set(uint8_t id, int32_t value)
 		rs.roger_off = (uint8_t)(value != 0 ? rs.roger_off & ~bit : rs.roger_off | bit);
 	} else if (id == UI_SET_ROGER_TAIL) {
 		rs.roger_tail = (uint8_t)(value < 0 ? 0 : value > 20 ? 20 : value);
+	} else if (id == UI_SET_ROGER_LEVEL) {
+		rs.roger_level = (uint8_t)(value < 1 ? 1 : value > 10 ? 10 : value);
 	} else if (id == UI_SET_TAC_LEVEL) {
 		rs.tac_level = (uint8_t)(value < 1 ? 1 : value > 10 ? 10 : value);
 	} else if (id >= UI_SET_TAC_N_KEY && id <= UI_SET_TAC_N_RXEND) {

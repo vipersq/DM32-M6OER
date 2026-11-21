@@ -4,7 +4,7 @@
 #include "radio/roger_sound.h"
 
 #define FS		8000u
-#define AMP		6500	// about -14 dBFS: a gentle level through the vocoder, well clear of clipping
+#define AMP		1300	// a level step: 5 of them, the default, about -14 dBFS through the vocoder
 #define RAMP		16	// 2 ms fade in and out of each tone: no clicks
 
 typedef struct {
@@ -87,8 +87,9 @@ static int32_t sine(uint32_t phase)
 	return v;
 }
 
-void roger_gen_start(roger_gen_t *g, uint8_t sound)
+void roger_gen_start(roger_gen_t *g, uint8_t sound, uint8_t level)
 {
+	g->amp = AMP * (int32_t)(level >= 1u && level <= 10u ? level : ROGER_LEVEL_DEFAULT);
 	g->n = roger_steps(sound, &g->s);
 	g->i = 0;
 	g->left = (uint16_t)(g->s[0].ms * (FS / 1000u));
@@ -115,7 +116,7 @@ bool roger_gen_block(roger_gen_t *g, int16_t *pcm, unsigned count)
 		int32_t v = 0;
 		if (st->hz != 0) {
 			uint32_t len = (uint32_t)st->ms * (FS / 1000u), pos = len - g->left;
-			int32_t a = AMP;
+			int32_t a = g->amp;
 			if (pos < RAMP) {
 				a = a * (int32_t)pos / RAMP;
 			} else if (g->left <= RAMP) {

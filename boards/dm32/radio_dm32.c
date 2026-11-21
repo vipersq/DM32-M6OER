@@ -675,13 +675,21 @@ static bool tx_tail(bool on)
 	return hrc7000_tx_tail(&modem, on);
 }
 
+static uint8_t tone_pct = 100;	// hal_radio_t.tx_tone_level
+
 static bool tx_tone(uint16_t hz)
 {
 	if (!transmitting || mode != RADIO_MODE_FM) {
 		return false;
 	}
-	hrc7000_tx_tone(&modem, hz, hrc7000_dtmf_dev(tx_hz, tx_wide));
+	uint32_t dev = (uint32_t)hrc7000_dtmf_dev(tx_hz, tx_wide) * tone_pct / 100u;
+	hrc7000_tx_tone(&modem, hz, (uint8_t)(dev != 0 ? dev : 1u));
 	return true;
+}
+
+static void tx_tone_level(uint8_t pct)
+{
+	tone_pct = pct < 1u ? 1u : pct > 100u ? 100u : pct;
 }
 
 // The sidetone: the codec plays the modem's tone, the speaker listens to the codec (speaker_source: not receiving)
@@ -937,6 +945,7 @@ const hal_radio_t dm32_radio = {
 	.tx_off = tx_off,
 	.dmr_tx_end = hrc_dmr_tx_end,
 	.tx_tone = tx_tone,
+	.tx_tone_level = tx_tone_level,
 	.tx_tail = tx_tail,
 	.tx_tone_key = tx_tone_key,
 	.tx_tone_side = tx_tone_side,

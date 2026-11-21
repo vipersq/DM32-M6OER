@@ -53,10 +53,13 @@ typedef struct {
 	uint8_t n, i;		// steps, the one playing
 	uint16_t left;		// samples left in step i
 	uint32_t phase;		// Q32 phase accumulator
+	int32_t amp;		// the tones' peak (roger_gen_start's level)
 	bool on;
 } roger_gen_t;
 
-void roger_gen_start(roger_gen_t *g, uint8_t sound);
+// level 1-10 (ROGER_LEVEL_DEFAULT the -14 dBFS a sound had before the setting); 0 or past 10 as the default
+#define ROGER_LEVEL_DEFAULT	5u
+void roger_gen_start(roger_gen_t *g, uint8_t sound, uint8_t level);
 // Fill count samples (silence once over); false once the sound has ended (the block is silence then)
 bool roger_gen_block(roger_gen_t *g, int16_t *pcm, unsigned count);
 

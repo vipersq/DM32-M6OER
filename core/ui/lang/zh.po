@@ -4440,6 +4440,11 @@ msgid "Roger sound"
 msgstr ""
 
 #: core/ui/ui_menus.c
+msgctxt "ROGER_VOLUME"
+msgid "Roger volume"
+msgstr ""
+
+#: core/ui/ui_menus.c
 msgctxt "ROGER_TAIL"
 msgid "Roger tail"
 msgstr ""

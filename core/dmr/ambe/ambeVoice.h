@@ -116,7 +116,7 @@ bool ambeVoiceTestSignal(void);
 // Any task
 // (Without CONFIG_SIG_TONES: its chains do this then)
 #if !CONFIG_SIG_TONES
-void ambeVoiceRogerTone(uint8_t sound);
+void ambeVoiceRogerTone(uint8_t sound, uint8_t level);	// level 1-10 (roger_gen_start)
 void ambeVoiceRogerToneCancel(void);
 bool ambeVoiceRogerToneBusy(void);
 #endif

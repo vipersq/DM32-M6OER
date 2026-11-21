@@ -59,6 +59,7 @@ typedef struct {
 	uint8_t tac_level;	// their volume, 1-10 of the beep level
 	uint8_t tac_count;	// times each plays, less one, 2 bits each by event (key, unkey, RX, RX end)
 	uint8_t roger_tail;	// carrier (or voice frames) kept after the roger sound, in 25 ms
+	uint8_t roger_level;	// its loudness 1-10 (FM deviation, the vocoder's input), 5 by default
 	bool tac_rxend;		// a tone when a reception has ended
 	uint8_t tac_tones_off;	// bit (1 << radio_mode_t): the tactical tones off on channels of that mode
 	uint8_t roger_off;	// bit (1 << radio_mode_t): the roger sound off on channels of that mode

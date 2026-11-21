@@ -467,6 +467,7 @@ typedef enum {
 	// Settings > Roger & tones: the roger tail (25 ms steps, 0-20), the tactical tones' volume (1-10) and how many
 	// times each plays (1-3): PTT, release, reception, its end
 	UI_SET_ROGER_TAIL, UI_SET_TAC_LEVEL,
+	UI_SET_ROGER_LEVEL,	// the roger sound's loudness 1-10
 	UI_SET_TAC_N_KEY, UI_SET_TAC_N_UNKEY, UI_SET_TAC_N_RX, UI_SET_TAC_N_RXEND,
 	UI_SET_MIC_COMP,	// the mic compressor (DMR, C4FM, NXDN): 0 off, 1 light, 2 strong
 	UI_SET_COUNT
