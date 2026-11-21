@@ -273,6 +273,10 @@ typedef struct {
 	uint8_t dmr_rx;			// RADIO_DMR_RX_* (both timeslots, any talkgroup, any color code; 0 = as the channel)
 	uint8_t dmr_rx_tg[3];		// a talkgroup heard on every DMR channel, little endian 24 bits (0 = none)
 	uint8_t mic_comp;		// the mic compressor before the vocoder: 0 off, 1 light, 2 strong
+	uint8_t roger_tail;		// carrier kept after the roger sound, in 25 ms (0-20)
+	uint8_t tac_level;		// the tactical tones' volume, 1-10 of the beep level
+	uint8_t tac_count;		// how many times each tactical tone plays, less one, 2 bits each: key, unkey, RX, RX end
+	uint8_t reserved_rt;		// 0
 } settings_t;
 
 // Pages: settings_t is stored as records of SETTINGS_PAGE_BYTES each (settings-store.md 2.1). Only the pages its size

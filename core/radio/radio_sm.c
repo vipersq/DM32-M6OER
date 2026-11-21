@@ -252,6 +252,46 @@ static bool beep_shared_now(void)
 }
 #endif
 
+static void beep(radio_sm_t *sm, uint8_t b);
+
+#if CONFIG_BEEP && (CONFIG_SIG_TONES || CONFIG_C4FM)
+// A tactical tone (BEEP_TAC_KEY .. RXEND): its style's pattern played 1-3 times (radio_settings_t.tac_count) with a
+// 70 ms gap, at the tactical volume (tac_level of the beep level). The length in ms
+static uint32_t tac_beep(radio_sm_t *sm, uint8_t b)
+{
+	const beep_seg_t *base;
+	uint8_t n = beep_pattern((beep_t)b, &base), times = (uint8_t)(((sm->set.tac_count >> (2u * (b - BEEP_TAC_KEY))) & 3u) + 1u);
+	beep_seg_t seg[BEEP_CUSTOM_MAX];
+	uint8_t k = 0;
+	uint32_t len = 0;
+	for (uint8_t r = 0; r < times && r < 3u; r++) {
+		if (r > 0 && k < BEEP_CUSTOM_MAX) {
+			seg[k++] = (beep_seg_t){ 0, 70 };
+			len += 70u;
+		}
+		if (k + n > BEEP_CUSTOM_MAX)
+			break;	// a long style's third time doesn't fit
+		for (uint8_t i = 0; i < n; i++) {
+			seg[k++] = base[i];
+			len += base[i].ms;
+		}
+	}
+	if (radio_tone_off(sm->set.tones_off, b) || k == 0) {
+		return 0;
+	}
+	uint8_t lvl = sm->set.tac_level >= 1u && sm->set.tac_level <= 10u ? sm->set.tac_level : 10u;
+	uint32_t level = (uint32_t)beep_level_now(sm) * lvl / 10u;
+	beep_play_custom(seg, k, (uint8_t)(level != 0 ? level : 1u), beep_shared_now());
+	return len;
+}
+#else
+static uint32_t tac_beep(radio_sm_t *sm, uint8_t b)
+{
+	beep(sm, b);
+	return 0;
+}
+#endif
+
 // A beep at the settings' level: mixed into the voice stream when one runs, else on its own stream
 static void beep(radio_sm_t *sm, uint8_t b)
 {
@@ -6382,9 +6422,18 @@ static void roger_cancel(radio_sm_t *sm)
 // The roger sound's steps on the carrier, then its end (every poll while it runs; the steps are on the poll's grid)
 static void roger_poll(radio_sm_t *sm, uint32_t now_ms)
 {
-	int i = roger_step_at(sm->roger_snd, now_ms - sm->roger_ms);
+	uint32_t t = now_ms - sm->roger_ms;
+	int i = roger_step_at(sm->roger_snd, t);
 	if (i < 0) {
-		tx_tone(0);
+		// The sound is over: the carrier stays for the tail (Settings > Roger & tones), so the far end's squelch
+		// and a repeater hear all of it before the unkey
+		if (sm->roger_step >= 0) {
+			tx_tone(0);
+			sm->roger_step = -1;
+		}
+		if (t < roger_length_ms(sm->roger_snd) + (uint32_t)sm->set.roger_tail * ROGER_GRID_MS) {
+			return;
+		}
 		sm->roger_ms = 0;
 		sm->view.roger = false;
 		fm_unkey(sm, false, now_ms);
@@ -6867,8 +6916,10 @@ static void dig_roger_poll(radio_sm_t *sm, uint32_t now_ms)
 	if (sm->dig_roger_done_ms == 0 && !ambeVoiceRogerToneBusy()) {
 		sm->dig_roger_done_ms = now_ms != 0 ? now_ms : 1;
 	}
-	bool out = sm->dig_roger_done_ms != 0 && now_ms - sm->dig_roger_done_ms >= RADIO_DIG_ROGER_GUARD_MS;
-	if (out || now_ms - sm->dig_roger_ms >= roger_length_ms(sm->set.roger_sound) + 1000u) {
+	bool out = sm->dig_roger_done_ms != 0 &&
+		   now_ms - sm->dig_roger_done_ms >= RADIO_DIG_ROGER_GUARD_MS + (uint32_t)sm->set.roger_tail * ROGER_GRID_MS;
+	if (out || now_ms - sm->dig_roger_ms >= roger_length_ms(sm->set.roger_sound) + 1000u +
+			(uint32_t)sm->set.roger_tail * ROGER_GRID_MS) {
 		dig_roger_stop(sm);
 		sm->ptt = true;		// the release the stack hasn't had yet
 		ptt_release(sm, false, now_ms);
@@ -6908,7 +6959,13 @@ static void ptt_down(radio_sm_t *sm, uint32_t now_ms)
 	// (a re-press during its tail), on a no-beep channel or while the host sends its own audio
 	if (sm->set.tac_key && tones_here(sm) && !sm->tac_pass && !sm->tac_hold && sm->view.state != RS_TX && !sm->view.ch.no_beep &&
 	    !sm->host_audio) {
-		beep(sm, BEEP_TAC_KEY);
+		uint32_t len = tac_beep(sm, BEEP_TAC_KEY);
+		if (len == 0) {	// the engine's own pattern (no custom ones in this build): its length
+			const beep_seg_t *segs;
+			for (uint8_t i = beep_pattern(BEEP_TAC_KEY, &segs); i > 0; i--)
+				len += segs[i - 1].ms;
+		}
+		sm->tac_key_len = len;
 		sm->tac_hold = true;
 		sm->tac_hold_ms = now_ms;
 		return;
@@ -7985,6 +8042,9 @@ static void settings_to_radio(const settings_t *st, radio_settings_t *s)
 	s->bcl = st->rs_bcl;
 	s->roger_beep = (st->rs_flags & SETTINGS_RS_ROGER_BEEP) != 0;
 	s->roger_sound = st->roger_sound < ROGER_COUNT ? st->roger_sound : 0;
+	s->roger_tail = st->roger_tail <= 20u ? st->roger_tail : 6u;
+	s->tac_level = st->tac_level >= 1u && st->tac_level <= 10u ? st->tac_level : 10u;
+	s->tac_count = st->tac_count;
 	s->tac_key = (st->tac_flags & SETTINGS_TAC_KEY) != 0;
 	s->tac_unkey = (st->tac_flags & SETTINGS_TAC_UNKEY) != 0;
 	s->tac_rx = (st->tac_flags & SETTINGS_TAC_RX) != 0;
@@ -8025,6 +8085,9 @@ static void radio_to_settings(const radio_settings_t *s, uint32_t now_ms)
 	st->rs_tot_warn_s = s->tot_warn_s;
 	st->rs_bcl = s->bcl;
 	st->roger_sound = s->roger_sound;
+	st->roger_tail = s->roger_tail;
+	st->tac_level = s->tac_level;
+	st->tac_count = s->tac_count;
 	st->tac_flags = (uint8_t)((s->tac_key ? SETTINGS_TAC_KEY : 0) | (s->tac_unkey ? SETTINGS_TAC_UNKEY : 0) |
 				  (s->tac_rx ? SETTINGS_TAC_RX : 0) | (s->leds_off ? SETTINGS_TAC_LEDS_OFF : 0) |
 				  ((s->tac_style << SETTINGS_TAC_STYLE_SHIFT) & SETTINGS_TAC_STYLE_MASK) |
@@ -8276,6 +8339,7 @@ void radio_sm_init(radio_sm_t *sm, uint32_t now_ms)
 
 	memset(sm, 0, sizeof(*sm));
 	sm->tac_style_was = 0xFFu;	// the first poll gives the beeps the stored style, with no preview
+	sm->tac_cfg_was = 0xFFFFu;
 #if CONFIG_SFR
 	direct_sm = sm;
 	if (board.radio->dmr_direct_query != NULL) {
@@ -9452,15 +9516,24 @@ static void tac_service(radio_sm_t *sm, uint32_t now_ms)
 		sm->tac_style_was = sm->set.tac_style;
 		beep_tac_style(sm->set.tac_style);
 		if (preview && sm->view.state != RS_TX) {
-			beep(sm, BEEP_TAC_KEY);
+			(void)tac_beep(sm, BEEP_TAC_KEY);
+		}
+	}
+	// A changed volume or number of beeps is heard at once (the beep that changed, else the key-up one)
+	uint16_t cfg = (uint16_t)(sm->set.tac_count | ((uint16_t)sm->set.tac_level << 8));
+	if (cfg != sm->tac_cfg_was) {
+		bool preview = sm->tac_cfg_was != 0xFFFFu;
+		uint8_t diff = (uint8_t)((cfg ^ sm->tac_cfg_was) & 0xFFu);
+		sm->tac_cfg_was = cfg;
+		if (preview && sm->view.state != RS_TX) {
+			uint8_t ev = 0;
+			while (ev < 3u && (diff & (3u << (2u * ev))) == 0)
+				ev++;
+			(void)tac_beep(sm, (uint8_t)(BEEP_TAC_KEY + (diff != 0 ? ev : 0u)));
 		}
 	}
 	if (sm->tac_hold) {
-		const beep_seg_t *segs;
-		uint32_t len = 0, t = now_ms - sm->tac_hold_ms;
-		for (uint8_t i = beep_pattern(BEEP_TAC_KEY, &segs); i > 0; i--) {
-			len += segs[i - 1].ms;
-		}
+		uint32_t len = sm->tac_key_len, t = now_ms - sm->tac_hold_ms;
 		if ((t >= 40u && !beep_busy()) || t >= len + 100u) {	// played, or a stream that never ran it
 			sm->tac_hold = false;
 			sm->tac_pass = true;
@@ -9471,11 +9544,11 @@ static void tac_service(radio_sm_t *sm, uint32_t now_ms)
 	bool tx = sm->view.state == RS_TX, rx = sm->view.state == RS_RX;
 	bool here = tones_here(sm) && !sm->view.ch.no_beep;
 	if (sm->tac_prev_tx && !tx && sm->set.tac_unkey && here && !sm->host_audio) {
-		beep(sm, BEEP_TAC_UNKEY);
+		(void)tac_beep(sm, BEEP_TAC_UNKEY);
 	} else if (!sm->tac_prev_rx && rx && !sm->tac_prev_tx && sm->set.tac_rx && here) {
-		beep(sm, BEEP_TAC_RX);
+		(void)tac_beep(sm, BEEP_TAC_RX);
 	} else if (sm->tac_prev_rx && !rx && !tx && sm->set.tac_rxend && here) {
-		beep(sm, BEEP_TAC_RXEND);	// the reception has ended (not our own key-up cutting it)
+		(void)tac_beep(sm, BEEP_TAC_RXEND);	// the reception has ended (not our own key-up cutting it)
 	}
 	sm->tac_prev_tx = tx;
 	sm->tac_prev_rx = rx;

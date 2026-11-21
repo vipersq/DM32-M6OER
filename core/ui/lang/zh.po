@@ -4275,6 +4275,31 @@ msgid "Quindar"
 msgstr ""
 
 #: core/ui/ui_menus.c
+msgctxt "ROGER_CB_TWO_TONE"
+msgid "CB two-tone"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "ROGER_CB_TOOT"
+msgid "CB toot"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "ROGER_DING_DONG"
+msgid "Ding-dong"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "ROGER_TRIPLE_LOW"
+msgid "Triple low"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "ROGER_ARPEGGIO"
+msgid "Arpeggio"
+msgstr ""
+
+#: core/ui/ui_menus.c
 msgctxt "NODE"
 msgid "Node"
 msgstr ""
@@ -4395,8 +4420,28 @@ msgid "LEDs off"
 msgstr ""
 
 #: core/ui/ui_menus.c
+msgctxt "VALUE_SINGLE"
+msgid "Single"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "VALUE_DOUBLE"
+msgid "Double"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "VALUE_TRIPLE"
+msgid "Triple"
+msgstr ""
+
+#: core/ui/ui_menus.c
 msgctxt "ROGER_SOUND"
 msgid "Roger sound"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "ROGER_TAIL"
+msgid "Roger tail"
 msgstr ""
 
 #: core/ui/ui_menus.c
@@ -4437,6 +4482,31 @@ msgstr ""
 #: core/ui/ui_menus.c
 msgctxt "TONE_STYLE"
 msgid "Tone style"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "TONE_VOLUME"
+msgid "Tone volume"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "KEY_UP_BEEPS"
+msgid "Key-up beeps"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "UNKEY_BEEPS"
+msgid "Unkey beeps"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "RX_BEEPS"
+msgid "RX beeps"
+msgstr ""
+
+#: core/ui/ui_menus.c
+msgctxt "RX_END_BEEPS"
+msgid "RX end beeps"
 msgstr ""
 
 #: core/ui/ui_menus.c

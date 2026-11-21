@@ -7024,12 +7024,14 @@ static const set_item_t s_my_radio[] = {
 static const int16_t v_bcl[] = { RADIO_BCL_OFF, RADIO_BCL_CARRIER, RADIO_BCL_WRONG_TONE };
 static const tr_id_t n_bcl[] = { TRN(VALUE_OFF, "Off"), TRN(CARRIER, "Carrier"), TRN(WRONG_TONE, "Wrong tone") };
 // The roger sound, every mode (radio/roger_sound.h): Off, then the sounds in roger_sound_t order (value = sound + 1)
-static const int16_t v_roger[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+static const int16_t v_roger[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 };
 static const int16_t v_mic_comp[] = { 0, 1, 2 };
 static const tr_id_t n_mic_comp[] = { TRN(VALUE_OFF, "Off"), TRN(VALUE_LIGHT, "Light"), TRN(VALUE_STRONG, "Strong") };
 static const tr_id_t n_roger[] = { TRN(VALUE_OFF, "Off"), TRN(CLASSIC, "Classic"), TRN(BEEP, "Beep"), TRN(DOUBLE_BEEP, "Double beep"),
 	TRN(TWO_TONE_UP, "Two-tone up"), TRN(TWO_TONE_DOWN, "Two-tone down"), TRN(TRIPLE_CHIRP, "Triple chirp"), TRN(SWEEP_UP, "Sweep up"), TRN(SWEEP_DOWN, "Sweep down"),
-	TRN(BEE_BOO, "Bee-boo"), TRN(MORSE_K, "Morse K"), TRN(MORSE_R, "Morse R"), TRN(QUINDAR, "Quindar") };
+	TRN(BEE_BOO, "Bee-boo"), TRN(MORSE_K, "Morse K"), TRN(MORSE_R, "Morse R"), TRN(QUINDAR, "Quindar"),
+	TRN(ROGER_CB_TWO_TONE, "CB two-tone"), TRN(ROGER_CB_TOOT, "CB toot"), TRN(ROGER_DING_DONG, "Ding-dong"),
+	TRN(ROGER_TRIPLE_LOW, "Triple low"), TRN(ROGER_ARPEGGIO, "Arpeggio") };
 _Static_assert(sizeof v_roger / sizeof v_roger[0] == ROGER_COUNT + 1u, "Off and each roger sound");
 _Static_assert(sizeof n_roger / sizeof n_roger[0] == ROGER_COUNT + 1u, "Off and each roger sound");
 // Menu > C4FM > Wires-X (and # on Home in C4FM): the node's status, its room; connect and disconnect. Opening it asks
@@ -7100,11 +7102,20 @@ static const set_item_t s_tactical[] = {
 	LIST(TRN(RED_BRIGHTNESS, "Red brightness"), "tactical backlight night", UI_SET_TAC_BRIGHT, v_tac_bright, n_tac_bright),
 	TOGGLE(TRN(LEDS_OFF, "LEDs off"), "tactical dark light TX RX lamp", UI_SET_TAC_LEDS),
 };
+// The roger tail in 25 ms steps, the tactical tones' repeats
+static const int16_t v_roger_tail[] = { 0, 2, 4, 6, 8, 10, 12, 16, 20 };
+static const tr_id_t n_roger_tail[] = { TRX(VALUE_0_MS, "0 ms"), TRX(VALUE_50_MS, "50 ms"), TRX(VALUE_100_MS, "100 ms"),
+	TRX(VALUE_150_MS, "150 ms"), TRX(VALUE_200_MS, "200 ms"), TRX(VALUE_250_MS, "250 ms"), TRX(VALUE_300_MS, "300 ms"),
+	TRX(VALUE_400_MS, "400 ms"), TRX(VALUE_500_MS, "500 ms") };
+static const int16_t v_tac_n[] = { 1, 2, 3 };
+static const tr_id_t n_tac_n[] = { TRN(VALUE_SINGLE, "Single"), TRN(VALUE_DOUBLE, "Double"), TRN(VALUE_TRIPLE, "Triple") };
 // Settings > Roger & tones: every transmit and tactical tone in one place (one setting each, every mode)
 static const set_item_t s_tones[] = {
 #if CONFIG_FM_TX_TONES
 	LIST(TRN(ROGER_SOUND, "Roger sound"), "roger beep end of transmission tone FM DMR C4FM", UI_SET_FM_ROGER, v_roger, n_roger),
 #endif
+	LIST(TRN(ROGER_TAIL, "Roger tail"), "roger beep hang carrier after delay end", UI_SET_ROGER_TAIL, v_roger_tail,
+	     n_roger_tail),
 	TOGGLE(TRN(ROGER_IN_FM, "Roger in FM"), "roger beep per mode analog", UI_SET_ROGER_FM),
 	TOGGLE(TRN(ROGER_IN_DMR, "Roger in DMR"), "roger beep per mode digital", UI_SET_ROGER_DMR),
 	TOGGLE(TRN(ROGER_IN_C4FM, "Roger in C4FM"), "roger beep per mode Fusion", UI_SET_ROGER_C4FM),
@@ -7113,6 +7124,13 @@ static const set_item_t s_tones[] = {
 	TOGGLE(TRN(RX_TONE_2, "RX tone"), "tactical military receive start blip", UI_SET_TAC_RX),
 	TOGGLE(TRN(RX_END_TONE, "RX end tone"), "tactical military receive end over blip", UI_SET_TAC_RXEND),
 	LIST(TRN(TONE_STYLE, "Tone style"), "tactical sound deep bloop chirp", UI_SET_TAC_STYLE, v_tac_style, n_tac_style),
+	NUMBER(TRN(TONE_VOLUME, "Tone volume"), "tactical tones loudness level", UI_SET_TAC_LEVEL, 1, 10, 1, NULL),
+	LIST(TRN(KEY_UP_BEEPS, "Key-up beeps"), "tactical PTT press single double triple", UI_SET_TAC_N_KEY, v_tac_n, n_tac_n),
+	LIST(TRN(UNKEY_BEEPS, "Unkey beeps"), "tactical PTT release single double triple", UI_SET_TAC_N_UNKEY, v_tac_n,
+	     n_tac_n),
+	LIST(TRN(RX_BEEPS, "RX beeps"), "tactical receive start single double triple", UI_SET_TAC_N_RX, v_tac_n, n_tac_n),
+	LIST(TRN(RX_END_BEEPS, "RX end beeps"), "tactical receive end single double triple", UI_SET_TAC_N_RXEND, v_tac_n,
+	     n_tac_n),
 	TOGGLE(TRN(TONES_IN_FM, "Tones in FM"), "tactical tones per mode analog", UI_SET_TONES_FM),
 	TOGGLE(TRN(TONES_IN_DMR, "Tones in DMR"), "tactical tones per mode digital", UI_SET_TONES_DMR),
 	TOGGLE(TRN(TONES_IN_C4FM, "Tones in C4FM"), "tactical tones per mode Fusion", UI_SET_TONES_C4FM),

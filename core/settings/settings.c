@@ -28,7 +28,7 @@ _Static_assert(SETTINGS_PAGES <= SETTINGS_PAGES_MAX, "settings_t outgrew its pag
 _Static_assert(sizeof(settings_t) % 4 == 0, "settings_t has tail padding");
 _Static_assert(offsetof(settings_t, dual_b) == SETTINGS_PAGE_BYTES, "page 1 starts at its first field");
 _Static_assert(offsetof(settings_t, ref_trim_ppb) % 2 == 0, "ref_trim_ppb is aligned");
-_Static_assert(sizeof(settings_t) == 440, "settings_t changed size: update docs/spec/settings-store.md 3 and this");
+_Static_assert(sizeof(settings_t) == 444, "settings_t changed size: update docs/spec/settings-store.md 3 and this");
 
 static settings_t live;			// under the quick lock
 static settings_t saved;		// what the newest record holds (or the defaults)
@@ -64,6 +64,8 @@ void settings_defaults(settings_t *s)
 	s->vfo2_cc = 1;
 	s->vfo2_ts = 1;
 	s->power_levels = board.power_count;
+	s->roger_tail = 6;	// 150 ms
+	s->tac_level = 10;
 }
 
 // Power levels stored against another level count (an older record, or a board whose levels changed) may name a

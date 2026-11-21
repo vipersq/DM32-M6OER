@@ -2860,7 +2860,7 @@ static void test_tx_limit(void)
 #endif
 }
 
-static void set_roger(radio_settings_t *s) { s->roger_beep = true; }
+static void set_roger(radio_settings_t *s) { s->roger_beep = true; s->roger_tail = 0; }
 
 // The DCS turn-off tail (hal_radio_t.tx_tail): after PTT release (and after the roger beep), the carrier stays up
 // RADIO_SUBTONE_TAIL_MS; PTT again cancels it and the transmission goes on; the time-out ends it
@@ -2917,8 +2917,8 @@ static void test_subtone_tail(void)
 	CHECK(sm.view.state != RS_TX && hw.tx_off_calls == 5);
 }
 
-static void set_roger_k(radio_settings_t *s) { s->roger_beep = true; s->roger_sound = ROGER_MORSE_K; }
-static void set_roger_double(radio_settings_t *s) { s->roger_beep = true; s->roger_sound = ROGER_DOUBLE; }
+static void set_roger_k(radio_settings_t *s) { s->roger_beep = true; s->roger_sound = ROGER_MORSE_K; s->roger_tail = 0; }
+static void set_roger_double(radio_settings_t *s) { s->roger_beep = true; s->roger_sound = ROGER_DOUBLE; s->roger_tail = 8; }
 static void set_roger_none(radio_settings_t *s) { s->roger_beep = false; s->roger_sound = 0; }
 
 // The roger sounds on the carrier (radio/roger_sound.h): each step's tone in turn, its pauses silent, then the unkey
@@ -2927,28 +2927,30 @@ static void set_roger_none(radio_settings_t *s) { s->roger_beep = false; s->roge
 static void test_roger_sounds(void)
 {
 	start();
-	settings(set_roger_k);	// K: 800 Hz 150 ms, pause 50, 800 Hz 50, pause 50, 800 Hz 150 (450 ms)
+	settings(set_roger_k);	// K: 700 Hz 150 ms, pause 50, 700 Hz 50, pause 50, 700 Hz 150 (450 ms), no tail
 	req(RREQ_PTT, 1);
 	run(500);
 	unsigned off0 = hw.tx_off_calls;
 	req(RREQ_PTT, 0);
-	CHECK(sm.view.state == RS_TX && sm.view.roger && hw.tone_hz == 800);
+	CHECK(sm.view.state == RS_TX && sm.view.roger && hw.tone_hz == 700);
 	run(160);
 	CHECK(sm.view.state == RS_TX && hw.tone_hz == 0);	// the gap after the dah
 	run(60);
-	CHECK(hw.tone_hz == 800);				// the dit
+	CHECK(hw.tone_hz == 700);				// the dit
 	run(300);
 	CHECK(sm.view.state == RS_IDLE && !sm.view.roger && hw.tone_hz == 0 && hw.tx_off_calls == (int)off0 + 1);
-	settings(set_roger_double);	// 1200 Hz 75, pause 50, 1200 Hz 75
+	settings(set_roger_double);	// 800 Hz 75, pause 50, 800 Hz 75, then a 200 ms tail
 	req(RREQ_PTT, 1);
 	run(500);
 	req(RREQ_PTT, 0);
-	CHECK(hw.tone_hz == 1200);
+	CHECK(hw.tone_hz == 800);
 	run(85);
 	CHECK(hw.tone_hz == 0 && sm.view.state == RS_TX);
 	run(50);
-	CHECK(hw.tone_hz == 1200);
+	CHECK(hw.tone_hz == 800);
 	run(150);
+	CHECK(sm.view.state == RS_TX && hw.tone_hz == 0 && sm.view.roger);	// the tail: carrier, no tone
+	run(200);
 	CHECK(sm.view.state == RS_IDLE && hw.tone_hz == 0);
 	// The table: every sound starts with a tone, sits on the poll's grid and fits a second
 	for (uint8_t i = 0; i < ROGER_COUNT; i++) {
@@ -3015,6 +3017,39 @@ static uint32_t beeps_tried(void)
 
 // Tactical tones (Settings > Sound): the key tone first, the key-up after it (PTT let go meanwhile keys nothing); the
 // unkey tone once the transmission has ended; the reception tone when the squelch opens. Off, none of them
+// The tactical tones' repeats and volume (radio_settings_t.tac_count, tac_level): a double unkey tone plays as one
+// pattern of the style's steps twice with a gap; the key tone holds the key for its whole length
+#if CONFIG_SIG_TONES || CONFIG_C4FM
+static void set_tac_double(radio_settings_t *s)
+{
+	s->tac_key = s->tac_unkey = true;
+	s->tac_count = (uint8_t)((2u << 0) | (1u << 2));	// key triple, unkey double
+	s->tac_level = 5;
+}
+
+static void test_tactical_repeats(void)
+{
+	start();
+	settings(set_tac_double);
+	const beep_seg_t *k;
+	uint32_t one = 0;
+	for (uint8_t i = beep_pattern(BEEP_TAC_KEY, &k); i > 0; i--)
+		one += k[i - 1].ms;
+	unsigned tx0 = hw.tx_calls;
+	req(RREQ_PTT, 1);
+	CHECK(sm.tac_hold && sm.tac_key_len == 3u * one + 2u * 70u);
+	run(one + 40u);
+	CHECK(sm.view.state != RS_TX);				// still the second and third beep
+	run(3u * one + 300u);
+	CHECK(sm.view.state == RS_TX && hw.tx_calls == (int)tx0 + 1);
+	beep_stats_t bs;
+	req(RREQ_PTT, 0);
+	run(100);
+	beep_get_stats(&bs);
+	CHECK(bs.last == BEEP_CUSTOM);
+}
+#endif
+
 static void test_tactical_tones(void)
 {
 	start();
@@ -4881,6 +4916,9 @@ int main(void)
 	test_roger_sounds();
 #endif
 	test_tactical_tones();
+#if CONFIG_SIG_TONES || CONFIG_C4FM
+	test_tactical_repeats();
+#endif
 	test_burst_key();
 	test_channel_burst();
 	test_burst_deadlines();

@@ -99,7 +99,7 @@ void beep_init(const hal_audio_t *audio);
 void beep_play(beep_t b, uint8_t level, bool shared);
 // Play a pattern given as steps (n up to BEEP_CUSTOM_MAX; 0 or a step list with no tone: nothing). The steps are copied,
 // so the caller's array may go. Two copies alternate: a pattern still playing is not rewritten under the audio side.
-// Built with CONFIG_SIG_TONES only
+// Built with CONFIG_SIG_TONES or CONFIG_C4FM (the tactical tones' repeats)
 void beep_play_custom(const beep_seg_t *segs, uint8_t n, uint8_t level, bool shared);
 // Every radio poll: stop the beep's own stream once the pattern is over (shared: the voice stream took over), and
 // let the amplifier go once its hang has run out

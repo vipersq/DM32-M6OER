@@ -108,8 +108,13 @@
 // FM transmit tones
 #define RADIO_BURST_HZ		1750
 #define RADIO_BURST_MIN_MS	1000
+#if CONFIG_SIG_TONES
 #define RADIO_ROGER_HZ1		1200
 #define RADIO_ROGER_HZ2		900
+#else
+#define RADIO_ROGER_HZ1		880	// the roger sounds' Classic (roger_sound.c): a mellower pair
+#define RADIO_ROGER_HZ2		660
+#endif
 #define RADIO_ROGER_STEP_MS	100	// each of the two roger tones
 #define RADIO_DIG_ROGER_GUARD_MS	200	// DMR / C4FM: after the encoder has the sound, its frames still queued go out
 // The DCS turn-off tail after PTT release (hal_radio_t.tx_tail; radio-features.md)
@@ -391,6 +396,8 @@ typedef struct {
 	bool tac_hold;			// PTT is down, the key tone plays; ptt_down runs when it is over
 	bool tac_pass;			// ptt_down called from the hold: no second tone
 	uint32_t tac_hold_ms;
+	uint32_t tac_key_len;
+	uint16_t tac_cfg_was;		// tac_count and tac_level last heard (0xFFFF: none yet)		// the key tone's length as played (its repeats too)
 	bool tac_prev_tx, tac_prev_rx;
 	uint8_t tac_style_was;		// the style last given to the beeps (0xFF: none yet); a change plays a preview
 #if CONFIG_DMR

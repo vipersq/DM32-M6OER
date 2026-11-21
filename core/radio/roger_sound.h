@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
-// Roger sounds: the end-of-transmission tone, one table for every mode. FM sends it as tones on the carrier
+// Roger sounds: the end-of-transmission tone, all but Quindar below 1.1 kHz (a mellow sound on FM and through the
+// vocoder), one table for every mode. FM sends it as tones on the carrier
 // (board.radio->tx_tone, stepped by the radio core's poll); DMR and C4FM send it through the AMBE+2 encoder in place
 // of the microphone (ambeVoiceTxTone). Steps are on a 25 ms grid, the radio core's poll period, so FM plays them as
 // written. Pure data and a sample generator: no RTOS, no board
@@ -26,6 +27,11 @@ typedef enum {
 	ROGER_MORSE_K,		// K (-.-) in Morse, "over"
 	ROGER_MORSE_R,		// R (.-.) in Morse, "received"
 	ROGER_QUINDAR,		// one 250 ms tone at 2475 Hz, the Apollo-era release tone
+	ROGER_CB_TWO_TONE,	// a CB rig's "dee-doo": a short high then a longer low tone, the 1980s-90s mobile kind
+	ROGER_CB_TOOT,		// one low round toot, a CB power mic's
+	ROGER_DING_DONG,	// a soft doorbell fall
+	ROGER_TRIPLE_LOW,	// three low pips
+	ROGER_ARPEGGIO,		// three rising notes (C E G)
 	ROGER_COUNT
 } roger_sound_t;
 

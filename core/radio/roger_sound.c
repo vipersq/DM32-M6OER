@@ -4,7 +4,7 @@
 #include "radio/roger_sound.h"
 
 #define FS		8000u
-#define AMP		9000	// about -11 dBFS: clear through the vocoder without clipping
+#define AMP		6500	// about -14 dBFS: a gentle level through the vocoder, well clear of clipping
 #define RAMP		16	// 2 ms fade in and out of each tone: no clicks
 
 typedef struct {
@@ -14,18 +14,23 @@ typedef struct {
 
 // Morse at a 50 ms dot (about 24 words a minute, on the 25 ms grid)
 static const sound_t sounds[ROGER_COUNT] = {
-	[ROGER_CLASSIC] = { 2, { { 1200, 100 }, { 900, 100 } } },
-	[ROGER_BEEP] = { 1, { { 1000, 150 } } },
-	[ROGER_DOUBLE] = { 3, { { 1200, 75 }, { 0, 50 }, { 1200, 75 } } },
-	[ROGER_UP] = { 2, { { 1000, 75 }, { 1500, 100 } } },
-	[ROGER_DOWN] = { 2, { { 1500, 75 }, { 1000, 100 } } },
-	[ROGER_CHIRP] = { 5, { { 1800, 50 }, { 0, 25 }, { 1800, 50 }, { 0, 25 }, { 1800, 50 } } },
-	[ROGER_SWEEP_UP] = { 6, { { 700, 50 }, { 1000, 50 }, { 1300, 50 }, { 1600, 50 }, { 1900, 50 }, { 2200, 50 } } },
-	[ROGER_SWEEP_DOWN] = { 6, { { 2200, 50 }, { 1900, 50 }, { 1600, 50 }, { 1300, 50 }, { 1000, 50 }, { 700, 50 } } },
-	[ROGER_BEE_BOO] = { 3, { { 1600, 125 }, { 0, 25 }, { 1100, 150 } } },
-	[ROGER_MORSE_K] = { 5, { { 800, 150 }, { 0, 50 }, { 800, 50 }, { 0, 50 }, { 800, 150 } } },
-	[ROGER_MORSE_R] = { 5, { { 800, 50 }, { 0, 50 }, { 800, 150 }, { 0, 50 }, { 800, 50 } } },
+	[ROGER_CLASSIC] = { 2, { { 880, 100 }, { 660, 100 } } },
+	[ROGER_BEEP] = { 1, { { 800, 150 } } },
+	[ROGER_DOUBLE] = { 3, { { 800, 75 }, { 0, 50 }, { 800, 75 } } },
+	[ROGER_UP] = { 2, { { 660, 75 }, { 880, 100 } } },
+	[ROGER_DOWN] = { 2, { { 880, 75 }, { 660, 100 } } },
+	[ROGER_CHIRP] = { 5, { { 1050, 50 }, { 0, 25 }, { 1050, 50 }, { 0, 25 }, { 1050, 50 } } },
+	[ROGER_SWEEP_UP] = { 6, { { 500, 50 }, { 600, 50 }, { 700, 50 }, { 800, 50 }, { 900, 50 }, { 1000, 50 } } },
+	[ROGER_SWEEP_DOWN] = { 6, { { 1000, 50 }, { 900, 50 }, { 800, 50 }, { 700, 50 }, { 600, 50 }, { 500, 50 } } },
+	[ROGER_BEE_BOO] = { 3, { { 1000, 125 }, { 0, 25 }, { 700, 150 } } },
+	[ROGER_MORSE_K] = { 5, { { 700, 150 }, { 0, 50 }, { 700, 50 }, { 0, 50 }, { 700, 150 } } },
+	[ROGER_MORSE_R] = { 5, { { 700, 50 }, { 0, 50 }, { 700, 150 }, { 0, 50 }, { 700, 50 } } },
 	[ROGER_QUINDAR] = { 1, { { 2475, 250 } } },
+	[ROGER_CB_TWO_TONE] = { 2, { { 1000, 75 }, { 750, 150 } } },
+	[ROGER_CB_TOOT] = { 1, { { 600, 200 } } },
+	[ROGER_DING_DONG] = { 2, { { 700, 100 }, { 525, 225 } } },
+	[ROGER_TRIPLE_LOW] = { 5, { { 600, 50 }, { 0, 25 }, { 600, 50 }, { 0, 25 }, { 600, 50 } } },
+	[ROGER_ARPEGGIO] = { 3, { { 525, 75 }, { 650, 75 }, { 775, 125 } } },
 };
 
 uint8_t roger_steps(uint8_t sound, const roger_step_t **steps)

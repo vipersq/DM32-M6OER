@@ -177,7 +177,7 @@ void ui_svc_c4fm_call_set(const char *call)
 static __attribute__((noinline)) int32_t setting_get_radio(uint8_t id)
 {
 #if CONFIG_C4FM
-	if ((id >= UI_SET_FM_BCL && id <= UI_SET_VFO_OFFSET) || (id >= UI_SET_DMR_BOTH_TS && id <= UI_SET_DMR_ANY_CC)) {
+	if ((id >= UI_SET_FM_BCL && id <= UI_SET_VFO_OFFSET) || (id >= UI_SET_DMR_BOTH_TS && id <= UI_SET_TAC_N_RXEND)) {
 		return ui_modes_setting_get(id);
 	}
 #endif
@@ -507,7 +507,7 @@ int32_t ui_svc_setting_get(uint8_t id)
 bool ui_svc_setting_set(uint8_t id, int32_t value)
 {
 #if CONFIG_C4FM
-	if ((id >= UI_SET_FM_BCL && id <= UI_SET_VFO_OFFSET) || (id >= UI_SET_DMR_BOTH_TS && id <= UI_SET_DMR_ANY_CC)) {
+	if ((id >= UI_SET_FM_BCL && id <= UI_SET_VFO_OFFSET) || (id >= UI_SET_DMR_BOTH_TS && id <= UI_SET_TAC_N_RXEND)) {
 		return ui_modes_setting_set(id, value);
 	}
 #endif

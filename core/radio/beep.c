@@ -137,7 +137,7 @@ static const int16_t beep_sine[64] = {
 static const hal_audio_t *aud;
 static beep_stats_t stats;
 
-#if CONFIG_SIG_TONES
+#if CONFIG_SIG_TONES || CONFIG_C4FM
 // Custom patterns (BEEP_CUSTOM): two copies, alternating
 static beep_seg_t cust[2][BEEP_CUSTOM_MAX];
 static uint8_t cust_n[2];
@@ -146,7 +146,7 @@ static uint8_t cust_next;
 
 // Handed from the radio task to the audio side
 static uint8_t req_pattern;
-#if CONFIG_SIG_TONES
+#if CONFIG_SIG_TONES || CONFIG_C4FM
 static uint8_t req_slot;
 #endif
 static uint8_t req_level;
@@ -226,7 +226,7 @@ bool beep_busy(void)
 
 void beep_play(beep_t b, uint8_t level, bool shared)
 {
-	if (b <= BEEP_NONE || (b >= BEEP_COUNT && (!CONFIG_SIG_TONES || b != BEEP_CUSTOM)) || level == 0) {
+	if (b <= BEEP_NONE || (b >= BEEP_COUNT && (!(CONFIG_SIG_TONES || CONFIG_C4FM) || b != BEEP_CUSTOM)) || level == 0) {
 		return;
 	}
 	stats.last = (uint8_t)b;
@@ -266,7 +266,7 @@ void beep_play(beep_t b, uint8_t level, bool shared)
 	stats.played++;
 }
 
-#if CONFIG_SIG_TONES
+#if CONFIG_SIG_TONES || CONFIG_C4FM
 void beep_play_custom(const beep_seg_t *segs, uint8_t n, uint8_t level, bool shared)
 {
 	bool tone = false;
@@ -424,7 +424,7 @@ static bool tone_mix(int16_t *spk)
 		cb_pattern = req_pattern;
 		const beep_seg_t *segs;
 		uint8_t count;
-#if CONFIG_SIG_TONES
+#if CONFIG_SIG_TONES || CONFIG_C4FM
 		if (cb_pattern == BEEP_CUSTOM) {
 			segs = cust[req_slot];
 			count = cust_n[req_slot];
