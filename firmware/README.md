@@ -3,7 +3,7 @@
 
 | File | Built from | Radio |
 |---|---|---|
-| `DM32-M6OER-v1.1.0.bin` | tag `v1.1.0` (`make BOARD=dm32 VARIANT=c4fm`) | Baofeng DM-32UV |
+| `DM32-M6OER-v1.2.0.bin` | tag `v1.2.0` (`make BOARD=dm32 VARIANT=c4fm`) | Baofeng DM-32UV |
 
 **Baofeng DM-32UV only.** There is no image for any other radio. Do not flash it to another model.
 
