@@ -255,7 +255,8 @@ void gfx_draw_trace(gfx_trace_kind_t kind, int x, int y, int w, int h, const int
 			// Two words run together. A mark of one glyph (the temporary dot) sits next to its value on purpose,
 			// and the wordmark is two colors of one word
 			bool mark = e - a == 1 || live[i].s[1] == 0;
-			bool wordmark = strcmp(live[i].s, "Radio") == 0 && strcmp(s + a, "Foundry") == 0;
+			bool wordmark = (strcmp(live[i].s, "Radio") == 0 && strcmp(s + a, "Foundry") == 0) ||
+					(strcmp(live[i].s, "DM32") == 0 && strcmp(s + a, "-M6OER") == 0);
 			if (!mark && !wordmark)
 				issue("no space between", s, x, y, w, h, live[i].s);
 		} else if (live[i].x0 < x1 && live[i].x1 > x0) {

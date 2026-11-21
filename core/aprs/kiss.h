@@ -33,6 +33,8 @@
 #define KISS_Q_DROPPED		1u	// a host frame was refused (queue full, no callsign, blocked)
 #define KISS_Q_SENT		2u	// a transmission went out
 #define KISS_Q_RETRY		3u	// a transmission failed or the channel was busy: queued frames wait and retry
+#define KISS_Q_STATUS		4u	// the answer to the host's 'Q' query, then: why RF is blocked (APRS_OK..), the mode
+				// (1 KISS, 2 KISS data), our callsign (ASCII, no SSID)
 
 #define KISS_FRAME_MAX		(1u + AX25_TNC2_MAX)	// the type byte and the largest payload we take
 

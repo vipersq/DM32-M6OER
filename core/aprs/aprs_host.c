@@ -57,6 +57,8 @@ void aprs_host_kiss_frame(const uint8_t *f, size_t n, uint32_t now_ms)
 			aprs_host_is_line((const char *)f + 2, n - 2u, now_ms);
 		} else if (n >= 2 && f[1] == KISS_TAG_NMEA) {
 			position_nmea((const char *)f + 2, n - 2u, false, now_ms);
+		} else if (n == 2 && f[1] == KISS_TAG_QUEUE) {
+			aprs_host_status_query();	// a host checking the link (RadioLink's radio test): nothing goes on air
 		}
 		break;
 	default:

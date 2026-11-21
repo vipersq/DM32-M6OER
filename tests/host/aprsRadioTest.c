@@ -942,6 +942,20 @@ static void test_kiss_data_mode(void)
 		sent = sent || (out[i] == 0xC0 && out[i + 1] == KISS_CMD_SETHW && out[i + 2] == KISS_TAG_QUEUE &&
 				out[i + 3] > 0 && out[i + 4] == KISS_Q_SENT);
 	CHECK(sent);
+	// the host's 'Q' query: the queue, nothing blocking RF, data mode, our callsign; nothing on air
+	int starts = hw.starts;
+	host_out_has("");
+	static const uint8_t query[] = { 0xC0, KISS_CMD_SETHW, KISS_TAG_QUEUE, 0xC0 };
+	aprs_host_feed(query, sizeof query, now);
+	m = aprs_host_output(out, sizeof out);
+	static const uint8_t status[] = { 0xC0, KISS_CMD_SETHW, KISS_TAG_QUEUE, 4, KISS_Q_STATUS, APRS_OK, 2, 'Q',
+					  '1', 'T', 'S', 'T', 0xC0 };
+	bool st = false;
+	for (size_t i = 0; i + sizeof status <= m; i++)
+		st = st || memcmp(out + i, status, sizeof status) == 0;
+	CHECK(st);
+	run(2000);
+	CHECK(hw.starts == starts);
 	// plain KISS (data mode off) keeps the burst rule and sends no queue reports
 	c.kiss_data = false;
 	aprs_set_cfg(&c, now);

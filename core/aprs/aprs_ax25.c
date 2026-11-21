@@ -401,6 +401,23 @@ static void host_queue_status(uint8_t event)
 	host_emit(KISS_CMD_SETHW, buf, sizeof buf);
 }
 
+void aprs_host_status_query(void)
+{
+	LOCK();
+	uint8_t buf[5 + AX25_CALL_LEN];
+	size_t n = 0;
+	buf[n++] = KISS_TAG_QUEUE;
+	buf[n++] = (uint8_t)(QUEUE_LEN - aprs_s.qn);
+	buf[n++] = KISS_Q_STATUS;
+	buf[n++] = aprs_s.block;
+	buf[n++] = aprs_s.cfg.kiss_data ? 2u : 1u;
+	for (size_t i = 0; i < AX25_CALL_LEN && aprs_s.me.call[i] != '\0'; i++) {
+		buf[n++] = (uint8_t)aprs_s.me.call[i];
+	}
+	host_emit(KISS_CMD_SETHW, buf, n);
+	UNLOCK();
+}
+
 // An APRS-IS line to the host helper: SetHardware, 'G', the line
 static void host_is_line(const char *line, size_t n)
 {

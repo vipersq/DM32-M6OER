@@ -353,7 +353,10 @@ received frames (RX builds) as KISS DATA, and lines for APRS-IS as SetHardware '
 ATAK bridge), not the APRS network: host frames skip the burst rule (section 3) and are limited by the queue (4
 frames) and CSMA alone; the callsign and amateur-frequency rules still apply. After each change the host gets
 SetHardware 'Q', the free slots, then the event: 0 queued, 1 refused, 2 sent, 3 failed or busy (frames wait and
-retry). KISS has no flow control; a host paces itself on these. Settings: `SETTINGS_APRS2_KISS_DATA`.
+retry). KISS has no flow control; a host paces itself on these. Settings: `SETTINGS_APRS2_KISS_DATA`. The host can ask
+at any time with SetHardware 'Q' and no data (in either KISS mode): the radio answers 'Q', free slots, event 4, then
+why RF is blocked (`APRS_OK` 0, no callsign 1, no frequency 2, not an amateur frequency 3, ...), the mode (1 KISS, 2
+data) and its callsign without SSID; nothing goes on air.
 
 ### 9.1 iGate
 

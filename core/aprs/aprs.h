@@ -258,6 +258,9 @@ void aprs_set_test_call(const char *call);
 bool aprs_host_frame(const uint8_t *frame, size_t n, uint32_t now_ms);
 // An APRS-IS line from the host helper (KISS SetHardware 'G')
 void aprs_host_is_line(const char *line, size_t n, uint32_t now_ms);
+// The host's 'Q' query (KISS SetHardware 'Q', no data): answers with the queue, why RF is blocked, the mode and our
+// callsign, without transmitting (aprs.md 9)
+void aprs_host_status_query(void);
 // KISS-encoded bytes for the host: copies up to max, returns the count (0 = nothing waiting)
 size_t aprs_host_output(uint8_t *out, size_t max);
 #else
@@ -269,6 +272,7 @@ static inline bool aprs_host_frame(const uint8_t *frame, size_t n, uint32_t now_
 	return false;
 }
 static inline void aprs_host_is_line(const char *line, size_t n, uint32_t now_ms) { (void)line; (void)n; (void)now_ms; }
+static inline void aprs_host_status_query(void) {}
 static inline size_t aprs_host_output(uint8_t *out, size_t max) { (void)out; (void)max; return 0; }
 static inline const char *aprs_path_text(uint8_t path) { (void)path; return ""; }
 static inline bool aprs_to_codeplug(void) { return false; }
