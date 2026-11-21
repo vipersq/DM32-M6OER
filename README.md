@@ -15,6 +15,7 @@
 > their SPDX lines kept); `core/c4fm/` and its tests are GPL-2.0-or-later, so this firmware as built is a
 > GPL-2.0-or-later work ([LICENSES/GPL-2.0-or-later.txt](LICENSES/GPL-2.0-or-later.txt)). This build's changes:
 > Copyright (c) 2026 Kriss M6OER, under the license of each file they are in.
+> Everything about licenses, sharing and what the image contains: [LICENSING.md](LICENSING.md).
 
 # RadioFoundry C4FM (proof of concept)
 

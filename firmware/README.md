@@ -9,4 +9,5 @@ Flash it with the RadioFoundry installer at radiofoundry.org: Select Features, "
 "Firmware file (.bin)". Untested builds can misbehave: keep your codeplug backed up.
 
 The image is a GPL-2.0-or-later work (it contains `core/c4fm/`); its source is this repository at the tag above.
-RadioFoundry's files are MIT ([LICENSE](../LICENSE)).
+RadioFoundry's files are MIT ([LICENSE](../LICENSE)). All licenses, and what you may do when sharing it:
+[LICENSING.md](../LICENSING.md). No warranty; the AMBE codec is not included.
