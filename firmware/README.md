@@ -3,7 +3,7 @@
 
 | File | Built from | Radio |
 |---|---|---|
-| `DM32-M6OER-v1.0.0.bin` | tag `v1.0.0` (`make BOARD=dm32 VARIANT=c4fm`) | Baofeng DM-32UV |
+| `DM32-M6OER-v1.0.1.bin` | tag `v1.0.1` (`make BOARD=dm32 VARIANT=c4fm`) | Baofeng DM-32UV |
 
 Flash it with the RadioFoundry installer at radiofoundry.org: Select Features, "Use my own firmware build",
 "Firmware file (.bin)". Untested builds can misbehave: keep your codeplug backed up.
