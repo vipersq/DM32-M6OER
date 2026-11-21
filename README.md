@@ -1,308 +1,84 @@
-# DM32-M6OER: a personal DM-32UV build
+# DM32-M6OER: custom firmware for the Baofeng DM-32UV
 
-> **Kriss M6OER's own firmware for the Baofeng DM-32UV**, built on
-> [RadioFoundry C4FM](https://github.com/lycanananas/RadioFoundryC4FM) (Yaesu System Fusion on the DM-32UV), which is
-> built on [RadioFoundry](https://radiofoundry.org). Not affiliated with either project. Build it with
-> `make BOARD=dm32 VARIANT=c4fm`.
->
+<p align="center">
+<img src="docs/ux/screens/240x320i10x5/boot.png" width="180" alt="Boot screen: skull picture and the callsign">
+<img src="docs/ux/screens/240x320i10x5/home_dual_two_rx.png" width="180" alt="Dual watch, both channels receiving">
+<img src="docs/ux/screens/240x320i10x5/rx_group.png" width="180" alt="A group call with the caller's name and city">
+<img src="docs/ux/screens/240x320i10x5/quick_dmr.png" width="180" alt="The Quick page on a DMR channel">
+<img src="docs/ux/screens/240x320i10x5/tools.png" width="180" alt="Tools: scan, position, hotspot, APRS and more">
+</p>
+
 > **⚠️ Baofeng DM-32UV only.** This firmware is built and tested for the DM-32UV alone. There is no DM32-M6OER image
 > for any other radio, and none is planned for now. Do not flash it to another model: it will not work and can leave
-> that radio unusable. The other radios RadioFoundry supports are listed further down; they need RadioFoundry's own
-> firmware, not this build.
->
-> Added here: P25 and NXDN from RadioFoundry alongside C4FM; C4FM VW (full rate) receive; roger sounds in FM, DMR and
-> C4FM; tactical tones (PTT, release, reception start and end, several styles) and a red tactical screen; Quick pages
-> per mode; DMR both timeslots, any talkgroup, any color code and an extra RX talkgroup; the caller's name and city
-> from the RadioID database; a mic compressor and a stronger mic level; dual watch; tactical side key functions; a
-> boot picture and callsign; a regrouped menu. See [docs/spec/c4fm.md](docs/spec/c4fm.md).
->
-> **License.** As the projects it comes from: RadioFoundry's files are MIT ([LICENSE](LICENSE), [AUTHORS](AUTHORS),
-> their SPDX lines kept); `core/c4fm/` and its tests are GPL-2.0-or-later, so this firmware as built is a
-> GPL-2.0-or-later work ([LICENSES/GPL-2.0-or-later.txt](LICENSES/GPL-2.0-or-later.txt)). This build's changes:
-> Copyright (c) 2026 Kriss M6OER, under the license of each file they are in.
-> Everything about licenses, sharing and what the image contains: [LICENSING.md](LICENSING.md).
+> that radio unusable.
 
-# RadioFoundry C4FM (proof of concept)
+Kriss M6OER's own firmware for the DM-32UV: **FM, DMR, C4FM (Yaesu System Fusion), P25 and NXDN in one firmware**.
+It is built on [RadioFoundry C4FM](https://github.com/lycanananas/RadioFoundryC4FM), which is built on
+[RadioFoundry](https://radiofoundry.org). Not affiliated with either project.
 
-> **This is a fork of [RadioFoundry](https://radiofoundry.org) that adds Yaesu System Fusion (C4FM DN voice) to the
-> Baofeng DM-32UV, beside FM and DMR, in one firmware.** It is a proof of concept: it works on the air with Yaesu radios
-> (callsign, DG-ID, voice both ways, repeaters and Wires-X), and its receiver is still weaker than a Yaesu radio's on
-> weak signals. Everything below this box is RadioFoundry's own README.
-
-| | |
-|---|---|
-| What it does | C4FM DN voice (AMBE+2 2450, the radio's own DMR codec), callsign and radio ID as an FT-70D sends them, DG-ID 0-99, C4FM channels in the codeplug, Last heard, soft decision decoding |
-| Radio | Baofeng DM-32UV (`make BOARD=dm32 VARIANT=c4fm`) |
-| How | the DMR chip's physical layer transmits the 4FSK stream at C4FM deviation; a software receiver demodulates the FM audio; the YSF layer 2 and the call engine are in `core/c4fm/` |
-| Spec | [docs/spec/c4fm.md](docs/spec/c4fm.md) |
-| Install and test | [docs/testing/dm32-c4fm-bench.md](docs/testing/dm32-c4fm-bench.md) |
-| License | RadioFoundry is MIT. `core/c4fm/` and its tests are GPL-2.0-or-later (the YSF layout follows MMDVMHost / MMDVM_CM), so a build with `CONFIG_C4FM=y` is a GPL-2.0-or-later work ([LICENSES/GPL-2.0-or-later.txt](LICENSES/GPL-2.0-or-later.txt)). Not affiliated with the RadioFoundry project or Yaesu |
-
-The AMBE+2 codec is not included: it comes from your radio's stock firmware ([codecs/README.md](codecs/README.md)).
-
-<p>
-<img src="docs/ux/c4fm/menu.png" width="200" alt="Menu: VFO or memory, zones, channels, FM, DMR, C4FM, tools, settings">
-<img src="docs/ux/c4fm/c4fm.png" width="200" alt="Menu > C4FM: last heard, DG-ID, callsign, advanced">
-<img src="docs/ux/c4fm/fm.png" width="200" alt="Menu > FM: squelch, busy lockout, roger beep, tones, offset">
-<img src="docs/ux/c4fm/dmr.png" width="200" alt="Menu > DMR: last caller, contacts, messages, recent, DMR settings">
-</p>
-
----
-
-# RadioFoundry
-
-**Free, MIT-licensed multi-mode firmware for affordable digital radios: DMR, P25, NXDN and FM.** One shared core runs the digital voice stacks, the UI, the codeplug and
-the host tools; each radio adds a thin board layer. It brings the features low-cost stock firmware leaves
-out, with a UI designed from first principles. Anyone can use it for anything, commercial products included.
-
-### 🌐 [radiofoundry.org](https://radiofoundry.org)
-
-**The website is the recommended way to install RadioFoundry and to edit your radio's codeplug.** In a Chromium browser
-(Chrome, Edge), plug in the radio and use the [web installer](https://radiofoundry.org/flash/index.html) to back up,
-install, update and restore, and the [Codeplug Editor](https://radiofoundry.org/codeplug/index.html) for channels, zones,
-contacts and the DMR ID database. Nothing to install, and your files never leave your computer. The command line tools
-and the [manual steps](docs/user/02-installing.md) are for scripting and for browsers that can't talk to a radio.
-
-**[Install](docs/user/02-installing.md)** · **[User manual](docs/user/README.md)** · **[Radios](#radios-and-status)** ·
-**[Features](#features)** · **[Developer docs](docs/dev/README.md)**
-
-<p>
-<img src="docs/ux/screens/240x320i10x5/boot.png" width="200" alt="Boot screen">
-<img src="docs/ux/screens/240x320i10x5/home_dual_two_rx.png" width="200" alt="Dual watch with both channels receiving">
-<img src="docs/ux/screens/240x320i10x5/tools.png" width="200" alt="Tools: scan, position, hotspot, USB network, repeater, roaming, APRS">
-<img src="docs/ux/screens/240x320i10x5/zone_offer.png" width="200" alt="A zone shared by another radio, offered for import">
-</p>
-<p>
-<img src="docs/ux/screens/160x120i5/rx_group.png" width="200" alt="A group call with the caller's name and location">
-<img src="docs/ux/screens/160x120i5/message_view.png" width="200" alt="A text message with quick replies">
-<img src="docs/ux/screens/160x120i5/zone_offer_preview.png" width="200" alt="Previewing a shared zone's channels">
-<img src="docs/ux/screens/160x120i5/emergency.png" width="200" alt="An emergency call">
-</p>
-<p>
-<img src="docs/ux/screens/128x64/home_fm.png" width="200" alt="Home screen on an FM channel">
-<img src="docs/ux/screens/128x64/tx.png" width="200" alt="Transmitting">
-<img src="docs/ux/screens/128x64/contacts.png" width="200" alt="Contacts">
-<img src="docs/ux/screens/128x64/zones.png" width="200" alt="Zones">
-</p>
-
-<sub>Top to bottom: DM-32UV (240x320 color), DM-1701 (160x120 color) and DM-1801 Pro (128x64 mono) screens, rendered
-by the UI simulator (`make -C tests/host ui-gallery`).</sub>
-
-## Radios and status
-
-<!-- generated: tools/boards.py docs radios; edit boards/*/board.toml [status] and docs/spec/radios.md -->
-| Radio | Builds | Host tests | On the radio | Support |
-|---|:---:|:---:|:---:|---|
-| [Baofeng DM-32UV](docs/testing/dm32-bringup.md) | ● | ● | ● | FM and DMR voice both ways, CTCSS/DCS, APRS both ways, GPS data, the hotspot and each split duplex half work on air. Open: FM deviation at 12.5 kHz and an outdoor GPS fix. |
-| [Baofeng DM-1701](docs/spec/hardware-dm1701.md), Retevis RT84 | ● | ● | ● | FM, DMR voice and data, text messages, alerts, emergency, scan, the hotspot, single frequency repeating, each split duplex half and the USB network services work on air. Open: standalone SFR and a two-radio split duplex pair. |
-| [Baofeng DM-1801 Pro](docs/testing/dm1801pro-bringup.md), DM-1801 | ● | ● | ● | FM with CTCSS/DCS, DMR voice with the radio's own codec, DMR data and text, the hotspot, single frequency repeating, the PPP network services and each split duplex half work on air. Open: VHF transmit and VOX. |
-| [Radioddity DB25-D PRO](docs/spec/hardware-db25d.md), Kydera CDR-300UV (mobile) | ● | ● | ● | FM and DMR voice both ways, the hotspot, the DMR VFO, the PPP network services, cable programming and settings storage work on the radio. The older FD6818 batches run the same image, untested on a radio. Open: the Retevis RT73. |
-| [TYT MD-380](docs/testing/md380-bringup.md), MD-390, Retevis RT3 | ● | ● | ● | FM with CTCSS both ways, DMR voice and SMS in simplex and through a repeater or hotspot on either slot, and codeplug and ID database programming work on a UHF radio. Open: DCS, the tone deviation and the untested VHF image. |
-| [TYT MD-UV380](docs/testing/mduv380-bringup.md), MD-UV390, Retevis RT3S, MD-UV390 Plus 10 W | ● | ● | ● | Built on the UV380 family code, with the MD-UV380's keys, display, power tables and GPS. Run on radios by community testers. |
-| [TYT MD-9600](docs/spec/hardware-md9600.md), Retevis RT90 (mobile) | ● | ● | ● | One image serves every board revision. On a V1-V3 radio, FM and DMR on both bands, DMR voice and data, text messages, roaming, scan, dual watch, APRS, the hotspot, each split duplex half and the USB network services work on air, with every power level checked on a wattmeter on both bands. V4A/V5 boards are detected; on older boards the radio asks for the revision once. Open: V4 and V4A/V5 boards have not run on a radio, and SFR loses inbound voice frames. |
-| [Retevis RT10](docs/spec/hardware-rt10.md) | ● | ● | ● | Boots from the boot ROM with the host link, stub entry, the watchdog and the crash log. FM receive with CTCSS/DCS decode, FM transmit, DMR transmit and receive with the radio's own codec, P25 (conventional, and trunked transmit) and NXDN at 4800 bit/s on stored channels, and APRS transmit work on the radio. |
-| Anytone AT-D868UV / AT-D878UV / AT-D878UVII Plus, BTECH DMR-6X2, Alinco DJ-MD5, Radioddity GD-AT10G | ○ | ○ | ○ | In progress ([#291](https://github.com/radiofoundry/radiofoundry/pull/291)). A new platform (GD32F30x) and a new DMR chip (SCT3258, which runs the vocoder itself), so it starts the Anytone family ([hardware-anytone.md](docs/spec/hardware-anytone.md)). |
-| Radioddity GD-77, TYT MD-760, GD-77S, Baofeng DM-1801 v1 / DM-860, RD-5R | ◐ | ◐ | ◐ | In progress ([#111](https://github.com/radiofoundry/radiofoundry/pull/111)). A new platform: a different MCU (NXP MK22FN512), the same HR_C6000 and AT1846S, a 128x64 mono LCD. A DM-1801 bought new today is not v1, and the look-alike DR-1801 is unrelated. |
-| Radioddity GD-88 | ◐ | ◐ | ○ | In progress ([#132](https://github.com/radiofoundry/radiofoundry/pull/132)). Dual receiver on the HR_C7000 platform (chip count not confirmed yet); should reuse much of the DM-32UV port. |
-| Baofeng DM-36 | ○ | ○ | ○ | In progress ([#607](https://github.com/radiofoundry/radiofoundry/pull/607)). Built on the DM-32UV's platform: FM, the display, keys and programming run; DMR voice on air and power levels open. |
-| Anytone AT-D578UV (mobile) | ○ | ○ | ○ | In progress ([#291](https://github.com/radiofoundry/radiofoundry/pull/291)). The 878's chips in a mobile, with a mid-run MCU change: two platforms ([hardware-anytone.md](docs/spec/hardware-anytone.md)). |
-| Radioddity DB40-D, Kydera CDR-700UV (mobile) | ○ | ○ | ○ | Planned. Hardware needed. Two HR_C7000-class processors (A and B), like the GD-88, so it follows the GD-88 port. |
-| TYT MD-2017 / Retevis RT82 | ○ | ○ | ○ | Planned. The DM-1701's STM32 and HR_C6000 pair with two receivers, so it should reuse the STM32F4 platform. The hardware can receive two channels at once. |
-| BTECH DMR-6X2 PRO | ○ | ○ | ○ | Planned. Built on the AT-D878UVII Plus, so it should follow the Anytone port. |
-| BridgeCom Maverick | ○ | ○ | ○ | Planned. Sold as an upgraded AT-D878UV, so it likely follows the Anytone port. |
-<!-- end generated -->
-
-● done&nbsp;&nbsp; ◐ partly, or only in the linked pull request so far&nbsp;&nbsp; ○ not yet
-
-- **Releases** carry firmware for the supported radios (without the codec), `rfoundry` for Windows, macOS and Linux,
-  and the user manual as a PDF. Nothing to build: install with the [web installer](https://radiofoundry.org/flash/index.html), or see [Installing](docs/user/02-installing.md).
-- **What has been checked on the air**, per feature and per radio: [on-air coverage](docs/testing/on-air-coverage.md)
-  and the [feature matrix](docs/feature-matrix.md#checked-on-each-radio). "Host-tested" means it works against
-  simulated chips, not yet on air.
-- **Check TX frequency** against an external reference (counter, service monitor or MMDVMCal) before relying on it:
-  accuracy comes from each radio's factory calibration, and one MD-380 measured 1.9 kHz high
-  ([#108](https://github.com/radiofoundry/radiofoundry/issues/108)).
-- The chips in each radio and the planned port order: [docs/spec/radios.md](docs/spec/radios.md).
+**Download:** [the latest release](https://github.com/vipersq/DM32-M6OER/releases/latest) or [firmware/](firmware/).
+**Experimental:** use at your own risk and keep your codeplug backed up.
 
 ## Features
 
-| Feature | What it does |
+| Area | What you get |
 |---|---|
-| **DMR voice** | Group and private calls, talker alias, basic privacy ([dmr-voice](docs/spec/dmr-voice.md)) |
-| **DMR data** | Text messages, wireless zone & channel sharing, ARS, LRRP, call alert, radio check ([dmr-data](docs/spec/dmr-data.md), [zone-share](docs/spec/zone-share.md)) |
-| **Emergency** | Alarm, emergency call with hot mic, alerts ([dmr-emergency](docs/spec/dmr-emergency.md)) |
-| **FM** | CTCSS/DCS, roger beep, 1750 Hz burst ([radio-features](docs/spec/radio-features.md)) |
-| **Dual watch, scan, VFO** | Two channels at once; zone, VFO and dual watch scan that stops for DMR calls in progress; any frequency by hand in FM or DMR ([radio-features](docs/spec/radio-features.md)) |
-| **Roaming** | Moves to the strongest repeater of a zone, surveying sites during idle beacons ([dmr-roaming](docs/spec/dmr-roaming.md)) |
-| **APRS** | Position, status and messages on FM, positions over DMR to an APRS gateway, KISS TNC ([aprs](docs/spec/aprs.md)) |
-| **Hotspot** | The radio is an MMDVM modem over USB, including MMDVM single frequency repeating ([mmdvm-protocol](docs/spec/mmdvm-protocol.md), [sfr](docs/spec/sfr.md)) |
-| **USB network** | The radio is a USB network adapter that routes IP over DMR, with a status page, rigctld, KISS over TCP, APRS-IS, mDNS, TFTP and SNMP on the link ([usb-network](docs/spec/usb-network.md), [tcp-services](docs/spec/tcp-services.md)) |
-| **Split duplex repeater** | Experimental: two radios on one MMDVM host as a full duplex repeater ([split-duplex](docs/spec/split-duplex.md)) |
-| **Programming** | The Codeplug Editor on the web site, or qdmr ([cps-protocol](docs/spec/cps-protocol.md)) |
-| **UI** | Designed from first principles, the same on a 128x64 mono LCD or a 240x320 color panel, keypad or knob, with press budgets checked by the host tests ([principles](docs/ux/principles.md), [screens](docs/ux/screens/)) |
+| Modes | FM, DMR, C4FM (DN voice, DG-ID, Wires-X), P25 and NXDN |
+| DMR | both timeslots, any talkgroup and any colour code monitoring, an extra RX talkgroup, the caller's name and city from the RadioID database |
+| Audio | 17 roger beeps (including a CB two-tone) with volume and tail; a mic compressor and a stronger mic level |
+| Tactical | key-up, unkey, RX and RX end tones (single, double or triple, adjustable volume), a red tactical screen, side key functions |
+| Screen | your own boot picture with your callsign; Quick pages per mode; dual watch with both channels on screen |
+| Data | APRS with messaging and SmartBeaconing; a KISS TNC on the programming cable, with a data mode for [RadioLink](https://github.com/vipersq/RadioLink) (ATAK over radio) |
 
-What each radio supports is in the [feature matrix](docs/feature-matrix.md). Every feature that costs flash has a
-build switch ([build-config](docs/build-config.md)).
+What changed in this build, in detail: [docs/spec/c4fm.md](docs/spec/c4fm.md).
 
-## Interoperability
+## Installing
 
-**Across hardware.** One core runs on every radio, and never checks which radio it's on. A board file picks the chips
-and describes the bands, power levels, screen and keys. Today that's two MCUs (STM32F405, C-SKY CK803S), three DMR
-modems (HR_C5000, HR_C6000, HR_C7000) and four RF chips (AT1846S, BK4819, FD6818, SKY72310) under the same code.
-
-**With the radios and software people already have.** We support the formats other radios use:
-
-| Area | Supported now | Planned |
-|---|---|---|
-| Air interface | ETSI DMR Tier II: simplex, repeater, MMDVM SFR (single frequency repeater), repeater roaming | Standalone SFR (repeater and user roles on a channel); ETSI Tier III trunking |
-| Text messages | ETSI IP text (the default; individual texts confirmed); Motorola TMS; ETSI short data in 7-bit, ISO 8859, UTF-8 and UTF-16; ETSI UDT text | Hytera text format |
-| Location | Motorola LRRP location answers and ARS registration; ETSI GPS Info in voice calls (the caller's position shown with distance and bearing, ours sent from the APRS position); APRS position, status and messages on FM (Bell 202 AFSK) and positions over DMR to an APRS gateway ID; KISS TNC on USB | NMEA from the radio's GPS receiver, ETSI UDT location reports, APRS receive and iGate on radios that can sample received audio |
-| Signaling | call alert, radio check and emergency, each in the Motorola and ETSI forms; talker alias in all four ETSI formats | DTMF and 5-tone on FM |
-| Privacy and encryption | Motorola Basic Privacy, Anytone 16-bit Basic Privacy | ARC4 and AES-256 per the DMR Association interoperability profiles |
-| Programming | The Codeplug Editor on the web site: every RadioFoundry radio over USB or the programming cable, CSV and qdmr YAML import and export, DMR ID database and contacts from RadioID.net. qdmr, over its open-firmware codeplug protocol | an open, published native codeplug format with its own qdmr driver |
-| Hotspot and network | MMDVM modem protocol (MMDVMHost, Pi-Star, WPSD and the networks behind them); IP over DMR with the radio as a USB network adapter (confirmed data, SAP 3 compressed UDP headers, control station mode for dispatch software); HTTP status, Hamlib rigctld, KISS over TCP, APRS-IS, mDNS, TFTP and SNMPv2c on the USB link; two radios as one full duplex repeater (experimental, build switch; each half passes on air, one pair checked on the bench) | the split duplex host side (`tools/split_duplex_host.py` is a test host) |
-| Audio to a computer | | USRP over UDP (AllStarLink, DVSwitch), USB sound card with serial-line PTT ([usb-audio](docs/spec/usb-audio.md)) |
-
-"Supported now" means built and passing its tests; [Radios and status](#radios-and-status) says what is checked on air.
-Every format is specified in [docs/spec](docs/spec), so other projects can implement the same thing.
+1. Download `DM32-M6OER-vX.Y.Z.bin` from the [latest release](https://github.com/vipersq/DM32-M6OER/releases/latest).
+2. Flash it with the installer at [radiofoundry.org](https://radiofoundry.org): Select Features, "Use my own firmware
+   build", "Firmware file (.bin)".
+3. Cable: the radio's USB programming cable (K1 plug, CH340 or FTDI chip). The USB-C cable in the box only charges
+   the battery.
 
 ## The AMBE codec
 
-DMR voice needs DVSI's proprietary AMBE+2 vocoder. RadioFoundry never ships it, in this repository or in any binary.
-
-Each radio runs the codec from its own stock firmware. [rfoundry](tools/rfoundry/README.md) takes it from the stock
-firmware file you downloaded, on your machine, checks that file by SHA-256 and writes the codec with RadioFoundry. If the radio
-already holds the right codec, it writes only RadioFoundry's own sectors. Without a codec the firmware runs FM only. Details
-and supported stock files: [the codec](docs/dev/codec.md).
+DMR and C4FM voice need DVSI's proprietary AMBE+2 vocoder. It is **not included**, in this repository or in any
+image: the installer takes it from your own radio's stock firmware. Without it the firmware runs FM only. Details:
+[the codec](docs/dev/codec.md).
 
 ## Building
 
-You need make, Python 3.11 or later, and `arm-none-eabi-gcc` (STM32F405 radios) or a `csky-elf` GCC (HR_C7000
-radios).
+You need make, Python 3.11 or later and a `csky-elf` GCC (`tools/build-csky-toolchain.sh`).
 
 ```
-tools/boards.py list        # the board ids
-make BOARD=dm1701           # one board's image; there is no default board
-make -C tests/host          # host tests
-tools/ci.sh                 # everything a pull request must pass
+make BOARD=dm32 VARIANT=c4fm      # build/dm32-c4fm/rfoundry_dm32.bin
+make -C tests/host                # host tests
 ```
-
-Toolchains, make targets and each radio's flashing route: [building](docs/dev/building.md).
-
-## Documentation
-
-| | |
-|---|---|
-| [User manual](docs/user/README.md) | Installing, keys and screens, FM, DMR, messages, hotspot, settings, troubleshooting (also a PDF in each release) |
-| [Developer docs](docs/dev/README.md) | Architecture, building, adding a radio, testing, the debug link, CPS, the codec, contributing, releases |
-| [Specs](docs/spec/README.md), [UX](docs/ux/), [Testing](docs/testing/README.md) | Behavior, hardware and protocols; UI design; test procedures. Everything: [docs/README.md](docs/README.md) |
-
-## How it's tested
-
-| Level | What it does |
-|---|---|
-| Unit | Single pieces (error correction, encoders, the settings format) against answers from the standards or real radios |
-| Software in the loop | The real firmware code, built for the host, runs whole features (calls, messages, codeplug writes) against simulated chips |
-| UI simulator | Draws the real screens at every display size, walks the menus with scripted keys, and renders every screenshot here |
-| Hardware in the loop | The same kind of scripts against a radio on USB over the [debug link](docs/spec/debuglink.md), with an SDR bench as the other station ([tests/hil](tests/hil/README.md)) |
-
-`tools/ci.sh` builds every radio with each feature switch on and off, checks that every image fits, and runs the
-license and clean-room checks. CI runs the host tests (also under ASan and UBSan) and every default build on each
-push, and the full matrix nightly ([CI](docs/dev/ci.md), [testing](docs/dev/testing.md)).
-
-## FAQ
-
-**Why allow commercial use?**
-
-Why not? Commercial use is the reason we can buy $40 DMR radios. If everything DMR were ham-only, we would still be
-paying $500 for a decent radio. Nobody "loses" here, because the project authors aren't trying to make any money off
-of this. If someone can figure out a way to use it in their product and make money, great! We're not in the business
-of selling DMR firmware, we just want everyone to have access to a decent one.
-
-**Why reinvent the wheel?**
-
-RadioFoundry covers most of these radios with one core under a license that lets anyone use it, so work on one radio
-helps every other.
-
-**Why another radio firmware?**
-
-DMR has features that cheaper radios almost never implement: data, location, emergency, roaming, IP. They are
-useful in commercial service and to hams alike.
-
-**How can I help?**
-
-Any way you can:
-
-- **Test and report.** Run RadioFoundry on your radio and [report what breaks](https://github.com/radiofoundry/radiofoundry/issues/new?template=bug_report.yml). If the radio restarted,
-  include the crash log from **Settings > Advanced > Crash log** ([settings](docs/user/17-settings.md#crash-log)).
-- **Ask.** [Request a feature](https://github.com/radiofoundry/radiofoundry/issues/new?template=feature_request.yml) or [a radio](https://github.com/radiofoundry/radiofoundry/issues/new?template=radio_request.yml) you'd like supported.
-- **Contribute.** Send pull requests for code or docs ([contributing](docs/dev/contributing.md)).
-- **Donate or lend a radio.** This helps the most, especially older models that are hard to find now, because every
-  port needs the hardware on the bench.
-
-**Can I use RadioFoundry in my own project?**
-
-Yes, including commercial and closed-source products. The license has one condition: keep our copyright and
-license notices in the code you copy and with the firmware you ship. We also ask that you give your project its
-own name. If you're adding a feature, we'd be glad to have it here, credited to you, on every radio whose
-hardware can run it: start a [discussion](https://github.com/radiofoundry/radiofoundry/discussions) or send a pull
-request. Details: [using RadioFoundry in your project](FORKING.md).
-
-**Was this project AI-generated?**
-
-No. This project is the result of thousands of hours of combined human effort from several contributors, spent on
-radio teardowns, reverse engineering, software architecture, and testing. AI was used as a pair programmer to speed up
-support for additional radios and to make the project's ambitious scope possible and sustainable.
-
-## Clean room and licensing
-
-RadioFoundry is MIT licensed ([LICENSE](LICENSE)) and a clean-room project: code is written from prose specs, datasheets and
-public standards, independent of earlier radio firmwares. No GPL code, no non-commercial code, no vendor SDKs. The
-rules and checks: [docs/CLEANROOM.md](docs/CLEANROOM.md). Third-party code in `third_party/` (FreeRTOS, TinyUSB, ST's
-HAL and CMSIS) keeps its own permissive license ([LICENSES/](LICENSES/)). So do the few files in the tree ported from
-permissively licensed code, each under its original notice: the full-rate voice decoder's dequantizer and tables come
-from mbelib (ISC). To build on RadioFoundry in
-another project: [using RadioFoundry in your project](FORKING.md).
-
-## Acknowledgements
-
-RadioFoundry builds on years of community work that opened these radios up. None of that code is in RadioFoundry (see above), but
-the reverse engineering and documentation behind it made this project possible. Thanks to:
-
-- Travis Goodspeed KK4VCZ and the md380tools contributors, for the first open work on the MD-380 family.
-- Warren Merkel KD4Z, for md380tools-vm and for support of the open DMR software development community.
-- Roger Clark VK3KYY, Kai Ludwig DG4KLU, Daniel Caujolle-Bert F1RMB and the OpenGD77 contributors, for open
-  firmware on the GD-77, MD-UV380, DM-1701, MD-9600 and others.
-- The OpenRTX team, for their hardware documentation.
-- The OpenDM32 project, for its DM-32UV research.
-- Jonathan Naylor G4KLX and the MMDVM and MMDVMHost contributors, for open hotspots and repeaters.
-- Cort Buffington N0MJS and the HBlink contributors, for open DMR networking.
-- Hannes Matuschek DM3MAT and the qdmr contributors, for qdmr, which RadioFoundry radios work with.
-
-And to the author of mbelib, whose ISC-licensed decoder the full-rate voice decoder's dequantizer is ported from.
-
-## Contributing
-
-Issues and pull requests are welcome. Read [docs/CLEANROOM.md](docs/CLEANROOM.md) first, keep radio-specific code out
-of `core/`, put anything that costs flash behind a `CONFIG_` switch, and make sure `tools/ci.sh` passes. Details:
-[contributing](docs/dev/contributing.md). Building something on RadioFoundry in your own project? Read
-[FORKING.md](FORKING.md): what the license asks, and why we'd rather have your feature here.
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `core/` | Radio-independent code: DMR stack (`core/dmr`), radio state machine (`core/radio`), UI (`core/ui`), hotspot, host link, codeplug, settings, CPS, debug link |
-| `hal/` | Interfaces the core uses (modem, RF, audio, codec, flash, display, input), and the `board_t` descriptor |
-| `drivers/` | Chip drivers shared across radios |
-| `platform/` | Per-SoC startup, clocks, interrupts and RTOS glue (`stm32f4`, `hrc7000`) |
-| `boards/` | One directory per radio: board descriptor, pins, feature defaults, linker script, codec hosting |
-| `boot/` | First stages in front of the application, for radios whose loader starts it directly (`boot/db25d`) |
-| `config/` | Build-time feature switches |
-| `third_party/` | Permissively licensed upstream code, as submodules (FreeRTOS, ST HAL and CMSIS, TinyUSB) |
-| `tools/` | Flashing (`rfoundry`), release packaging, codec merge, CPS client, debug link client (`rfoundry_debug.py`), CI, SDR bench tools |
-| `tests/host/` | Unit and SIL tests, the UI simulator (`tests/host/sim`) |
-| `tests/hil/` | HIL tests: pytest against a radio and the SDR bench |
-| `docs/spec/` | Behavior, hardware facts and protocols; `gotchas.md` lists past bugs by subsystem |
-| `docs/ux/` | UI principles, flows, the screenshot gallery |
-| `docs/user/`, `docs/dev/`, `docs/testing/` | User manual (built to PDF on release tags), developer documentation, test procedures |
+| `core/` | radio logic, protocols (DMR, C4FM in `core/c4fm/`, P25, NXDN, APRS) and the user interface |
+| `boards/dm32/` | the DM-32UV's wiring, display and calibration |
+| `platform/hrc7000/`, `drivers/` | the radio's processor and chips |
+| `tests/host/` | host tests and the screen gallery |
+| `firmware/` | the released images |
+| `docs/` | RadioFoundry's documentation (all radios) |
+
+## Licence
+
+The firmware image is **GPL-2.0-or-later** (it contains `core/c4fm/`, GPL-2.0-or-later). RadioFoundry's files are
+MIT ([LICENSE](LICENSE), [AUTHORS](AUTHORS)). The source of each image is this repository at its tag. This build's
+changes: Copyright (c) 2026 Kriss M6OER, under the license of each file they are in. Every license in the image and
+what you may do when sharing it: [LICENSING.md](LICENSING.md).
+
+## Credits
+
+- [RadioFoundry](https://radiofoundry.org) and its authors ([AUTHORS](AUTHORS)): the firmware this is built on.
+- [RadioFoundry C4FM](https://github.com/lycanananas/RadioFoundryC4FM): Yaesu System Fusion on the DM-32UV.
+
+The documentation under [docs/](docs/README.md) is RadioFoundry's and describes the whole project, including radios
+this build does not support.
+
+73 de M6OER
