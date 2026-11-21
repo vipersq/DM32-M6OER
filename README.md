@@ -5,6 +5,11 @@
 > built on [RadioFoundry](https://radiofoundry.org). Not affiliated with either project. Build it with
 > `make BOARD=dm32 VARIANT=c4fm`.
 >
+> **⚠️ Baofeng DM-32UV only.** This firmware is built and tested for the DM-32UV alone. There is no DM32-M6OER image
+> for any other radio, and none is planned for now. Do not flash it to another model: it will not work and can leave
+> that radio unusable. The other radios RadioFoundry supports are listed further down; they need RadioFoundry's own
+> firmware, not this build.
+>
 > Added here: P25 and NXDN from RadioFoundry alongside C4FM; C4FM VW (full rate) receive; roger sounds in FM, DMR and
 > C4FM; tactical tones (PTT, release, reception start and end, several styles) and a red tactical screen; Quick pages
 > per mode; DMR both timeslots, any talkgroup, any color code and an extra RX talkgroup; the caller's name and city
