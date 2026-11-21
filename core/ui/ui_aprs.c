@@ -222,7 +222,10 @@ static void aprs_item(uint16_t i, ui_item_t *it)
 	case AP_INTERVAL: sb_str(&b, tr(interval_names[interval_index(c.interval_s)])); break;
 	case AP_SMART: sb_str(&b, c.smart ? TR(VALUE_ON, "On") : TR(VALUE_OFF, "Off")); break;
 	case AP_VIA: sb_str(&b, tr(via_names[c.via < APRS_VIA_COUNT ? c.via : 0])); break;
-	case AP_KISS: sb_str(&b, c.kiss ? TR(VALUE_ON, "On") : TR(VALUE_OFF, "Off")); break;
+	case AP_KISS:
+		sb_str(&b, !c.kiss ? TR(VALUE_OFF, "Off") : CONFIG_APRS_AFSK && c.kiss_data ? TR(APRS_VALUE_KISS_DATA, "Data") :
+			TR(VALUE_ON, "On"));
+		break;
 	case AP_HEARD:
 		if (!CONFIG_APRS_RX) {
 			it->flags |= UI_ITEM_DIM;
@@ -287,7 +290,17 @@ static void aprs_select(uint16_t i, bool hold)
 	case AP_INTERVAL: c.interval_s = intervals[(interval_index(c.interval_s) + 1u) % N_INTERVALS]; break;
 	case AP_SMART: c.smart = !c.smart; break;
 	case AP_VIA: c.via = (uint8_t)((c.via + 1u) % APRS_VIA_COUNT); break;
-	case AP_KISS: c.kiss = !c.kiss; break;
+	case AP_KISS:
+		// Off, On (the APRS burst rule), Data (a frequency of the user's own: no burst rule, queue reports; aprs.md 9)
+		if (!c.kiss) {
+			c.kiss = true;
+			c.kiss_data = false;
+		} else if (CONFIG_APRS_AFSK && !c.kiss_data) {
+			c.kiss_data = true;
+		} else {
+			c.kiss = c.kiss_data = false;
+		}
+		break;
 	case AP_HEARD:
 		if (!CONFIG_APRS_RX) {
 			ui_toast(TR(APRS_WHY_CANT_RECEIVE, "This radio can't receive APRS"));

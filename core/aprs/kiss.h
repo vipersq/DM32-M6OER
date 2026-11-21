@@ -28,6 +28,11 @@
 
 #define KISS_TAG_IS_LINE	'G'	// SetHardware: an APRS-IS (TNC2) line
 #define KISS_TAG_NMEA		'N'	// SetHardware: an NMEA sentence
+#define KISS_TAG_QUEUE		'Q'	// SetHardware to the host, data mode: free queue slots, then a KISS_Q_* event
+#define KISS_Q_QUEUED		0u	// a host frame was queued
+#define KISS_Q_DROPPED		1u	// a host frame was refused (queue full, no callsign, blocked)
+#define KISS_Q_SENT		2u	// a transmission went out
+#define KISS_Q_RETRY		3u	// a transmission failed or the channel was busy: queued frames wait and retry
 
 #define KISS_FRAME_MAX		(1u + AX25_TNC2_MAX)	// the type byte and the largest payload we take
 

@@ -16,10 +16,10 @@
 #if CONFIG_APRS_AFSK
 #include "aprs/afsk.h"
 
-#define QUEUE_LEN	2		// frames waiting for the air
+#define QUEUE_LEN	4		// frames waiting for the air (KISS data mode keeps a few in flight)
 #define TONES_BYTES	512		// one transmission: preamble, frames, tail (4096 symbols, 3.4 s)
 #if CONFIG_APRS_RX
-#define OUT_RING	512		// KISS bytes for the host: received frames, iGate lines
+#define OUT_RING	1024		// KISS bytes for the host: received frames (two full ones escaped), iGate lines
 #else
 #define OUT_RING	256		// only our own lines to APRS-IS
 #endif

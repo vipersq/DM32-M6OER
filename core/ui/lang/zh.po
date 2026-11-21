@@ -990,6 +990,11 @@ msgid "As channel"
 msgstr "按信道"
 
 #: core/ui/ui_aprs.c
+msgctxt "APRS_VALUE_KISS_DATA"
+msgid "Data"
+msgstr "数据"
+
+#: core/ui/ui_aprs.c
 msgctxt "APRS_TOAST_SET_CALLSIGN_FIRST"
 msgid "Set your callsign first"
 msgstr "请先设置呼号"

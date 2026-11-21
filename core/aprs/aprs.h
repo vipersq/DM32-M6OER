@@ -70,6 +70,7 @@ typedef struct {
 	bool dmr_udt;		// ETSI UDT location, else Motorola LRRP
 	uint32_t dmr_dst;	// destination ID (private call)
 	bool kiss;		// KISS TNC on the host port
+	bool kiss_data;		// data mode: host frames limited only by the queue and CSMA, not the APRS burst rule
 	bool to_is;		// our beacons to APRS-IS through the host helper
 	bool rx_on;		// receive on the APRS frequency (boards with a receive path)
 	bool igate;		// RF -> APRS-IS

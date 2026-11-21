@@ -390,6 +390,17 @@ static void host_emit(uint8_t type, const uint8_t *data, size_t n)
 	aprs_s.v.host_out++;
 }
 
+// KISS data mode: the queue's state to the host after each change, so it sends no faster than the air takes frames
+// (KISS has no flow control): SetHardware, 'Q', free slots, the event (lock held)
+static void host_queue_status(uint8_t event)
+{
+	if (!aprs_s.cfg.kiss || !aprs_s.cfg.kiss_data) {
+		return;
+	}
+	uint8_t buf[3] = { KISS_TAG_QUEUE, (uint8_t)(QUEUE_LEN - aprs_s.qn), event };
+	host_emit(KISS_CMD_SETHW, buf, sizeof buf);
+}
+
 // An APRS-IS line to the host helper: SetHardware, 'G', the line
 static void host_is_line(const char *line, size_t n)
 {
@@ -989,7 +1000,8 @@ void aprs_rf_done(aprs_rf_result_t r, uint32_t now_ms)
 {
 	LOCK();
 	aprs_s.now = now_ms;
-	if (r == APRS_RF_SENT) {
+	bool sent = r == APRS_RF_SENT;
+	if (sent) {
 		queue_drop(aprs_s.taken);
 		aprs_s.v.rf_sent++;
 	} else {
@@ -1011,6 +1023,7 @@ void aprs_rf_done(aprs_rf_result_t r, uint32_t now_ms)
 	}
 	aprs_s.taken = 0;
 	aprs_s.v.rf_active = false;
+	host_queue_status(sent ? KISS_Q_SENT : KISS_Q_RETRY);
 	aprs_changed();
 	UNLOCK();
 }
@@ -1216,14 +1229,20 @@ bool aprs_host_frame(const uint8_t *frame, size_t n, uint32_t now_ms)
 	LOCK();
 	aprs_s.v.host_in++;
 	// Station identification: the source must be our callsign (any SSID); the APRS rules (amateur frequency,
-	// callsign) apply as to our own packets; a burst of HOST_BURST, then one per HOST_REFILL_MS
-	ok = ok && aprs_s.cfg.kiss && aprs_s.me_ok && strcmp(f.src.call, aprs_s.me.call) == 0 && aprs_s.host_tokens > 0 &&
-	     aprs_s.block == APRS_OK && queue_raw(K_HOST, frame, n);
+	// callsign) apply as to our own packets; a burst of HOST_BURST, then one per HOST_REFILL_MS. In data mode
+	// (a frequency of the user's own, not the APRS network's) the queue and CSMA are the only limit, and the host
+	// hears the queue's state after each change
+	bool data = aprs_s.cfg.kiss_data;
+	ok = ok && aprs_s.cfg.kiss && aprs_s.me_ok && strcmp(f.src.call, aprs_s.me.call) == 0 &&
+	     (data || aprs_s.host_tokens > 0) && aprs_s.block == APRS_OK && queue_raw(K_HOST, frame, n);
 	if (ok) {
-		aprs_s.host_tokens--;
+		if (!data) {
+			aprs_s.host_tokens--;
+		}
 	} else {
 		aprs_s.v.host_dropped++;
 	}
+	host_queue_status(ok ? KISS_Q_QUEUED : KISS_Q_DROPPED);
 	(void)now_ms;
 	UNLOCK();
 	return ok;

@@ -901,6 +901,60 @@ static void test_host_kiss_nmea(void)
 	CHECK(host_out_has("GQ1TST-7>" APRS_TOCALL ",TCPIP*:!/"));	// compressed, no messaging (no receive path)
 }
 
+// KISS data mode: no burst rule, the queue is the limit, and the host hears its state ('Q' SetHardware frames)
+static void test_kiss_data_mode(void)
+{
+	reset();
+	aprs_set_test_call("Q1TST");
+	aprs_cfg_t c;
+	aprs_get_cfg(&c);
+	c.kiss = true;
+	c.kiss_data = true;
+	aprs_set_cfg(&c, now);
+	run(100);
+	host_out_has("");
+	ax25_frame_t f;
+	uint8_t frame[AX25_FRAME_MAX];
+	const char *line = "Q1TST-9>TAKRF,NOGATE:{TA data";
+	CHECK(ax25_from_tnc2(line, strlen(line), &f));
+	f.dst.h = true;
+	size_t n = ax25_encode(&f, frame, sizeof(frame));
+	int ok = 0;
+	for (int i = 0; i < 6; i++)
+		ok += aprs_host_frame(frame, n, now) ? 1 : 0;
+	CHECK(ok >= 4);		// more than the APRS burst of 3
+	static const uint8_t queued_last_free0[] = { 0xC0, KISS_CMD_SETHW, KISS_TAG_QUEUE, 0, KISS_Q_QUEUED, 0xC0 };
+	static const uint8_t dropped[] = { 0xC0, KISS_CMD_SETHW, KISS_TAG_QUEUE, 0, KISS_Q_DROPPED, 0xC0 };
+	static uint8_t out[2048];
+	size_t m = aprs_host_output(out, sizeof out);
+	bool q0 = false, d = false;
+	for (size_t i = 0; i + 6 <= m; i++) {
+		q0 = q0 || memcmp(out + i, queued_last_free0, 6) == 0;
+		d = d || memcmp(out + i, dropped, 6) == 0;
+	}
+	CHECK(q0 && d);
+	// the air takes them: a 'sent' report with free slots again
+	CHECK(wait_start(hw.starts + 1, 5000));
+	wait_idle();
+	m = aprs_host_output(out, sizeof out);
+	bool sent = false;
+	for (size_t i = 0; i + 5 <= m; i++)
+		sent = sent || (out[i] == 0xC0 && out[i + 1] == KISS_CMD_SETHW && out[i + 2] == KISS_TAG_QUEUE &&
+				out[i + 3] > 0 && out[i + 4] == KISS_Q_SENT);
+	CHECK(sent);
+	// plain KISS (data mode off) keeps the burst rule and sends no queue reports
+	c.kiss_data = false;
+	aprs_set_cfg(&c, now);
+	run(30000);
+	host_out_has("");
+	CHECK(aprs_host_frame(frame, n, now));
+	m = aprs_host_output(out, sizeof out);
+	bool any_q = false;
+	for (size_t i = 0; i + 3 <= m; i++)
+		any_q = any_q || (out[i] == 0xC0 && out[i + 1] == KISS_CMD_SETHW && out[i + 2] == KISS_TAG_QUEUE);
+	CHECK(!any_q);
+}
+
 // The last try's ack wait ends while the frequency is blocked: the message is over, not pending forever
 static void test_message_ends_blocked(void)
 {
@@ -1905,6 +1959,7 @@ int main(void)
 	test_tx_power();
 	test_tx_power_own();
 	test_host_kiss_nmea();
+	test_kiss_data_mode();
 	test_messages();
 	test_message_ends_blocked();
 	test_third_party_messages();

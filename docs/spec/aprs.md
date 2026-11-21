@@ -349,6 +349,12 @@ Port 0 only. DATA frames are checked (section 3) and queued for RF; TXDELAY, PER
 ignored (the engine's own CSMA applies); SetHardware 'G' carries an APRS-IS line, 'N' an NMEA sentence. To the host:
 received frames (RX builds) as KISS DATA, and lines for APRS-IS as SetHardware 'G'.
 
+**Data mode.** "KISS on USB" steps Off, On, Data. Data is for a frequency of the user's own (a data link such as an
+ATAK bridge), not the APRS network: host frames skip the burst rule (section 3) and are limited by the queue (4
+frames) and CSMA alone; the callsign and amateur-frequency rules still apply. After each change the host gets
+SetHardware 'Q', the free slots, then the event: 0 queued, 1 refused, 2 sent, 3 failed or busy (frames wait and
+retry). KISS has no flow control; a host paces itself on these. Settings: `SETTINGS_APRS2_KISS_DATA`.
+
 ### 9.1 iGate
 
 The rules are in firmware (`aprs_igate.c`, after aprs-is.net "IGate Design" and "q Construct"); the APRS-IS TCP

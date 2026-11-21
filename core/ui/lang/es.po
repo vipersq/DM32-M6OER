@@ -988,6 +988,11 @@ msgid "As channel"
 msgstr "Como canal"
 
 #: core/ui/ui_aprs.c
+msgctxt "APRS_VALUE_KISS_DATA"
+msgid "Data"
+msgstr "Datos"
+
+#: core/ui/ui_aprs.c
 msgctxt "APRS_TOAST_SET_CALLSIGN_FIRST"
 msgid "Set your callsign first"
 msgstr "Define tu indicativo"
