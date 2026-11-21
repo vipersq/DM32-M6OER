@@ -5505,7 +5505,9 @@ static const char *about_text(void)
 	// wider than the display and the release wrapped without its label. A release: its name, then the commit it was
 	// built from; any other build: the commit alone
 	sb_str(&b, TR(ABOUT_BODY_FIRMWARE, "Firmware: "));
-	sb_str(&b, "C4FMFoundry\n");	// the C4FM fork of RadioFoundry
+	sb_str(&b, "DM32-M6OER\n");	// this build (README.md)
+	sb_str(&b, TR(ABOUT_BODY_BASED_ON, "Based on: "));
+	sb_str(&b, "C4FMFoundry, RadioFoundry\n");	// where it comes from (the licenses ask for the notices)
 	if (RFOUNDRY_RELEASE[0] != '\0') {
 		sb_str(&b, TR(ABOUT_BODY_RELEASE, "Release: "));
 		sb_str(&b, RFOUNDRY_RELEASE);

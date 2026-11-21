@@ -880,13 +880,13 @@ static bool draw_logo_splash(const char *board_name, const char *version, const 
 	char foot[48];
 	sbuf_t b;
 	sb_init(&b, foot, sizeof foot);
-	sb_str(&b, "C4FMFoundry  ");
+	sb_str(&b, "DM32-M6OER  ");
 	sb_str(&b, board_name);
 	sb_str(&b, "  ");
 	sb_str(&b, version);
 	if (gfx_text_width(ff, foot) > w) {
 		sb_init(&b, foot, sizeof foot);
-		sb_str(&b, "C4FMFoundry ");
+		sb_str(&b, "DM32-M6OER ");
 		sb_str(&b, version);
 	}
 	int foot_y = h - ff->h - 2;
@@ -929,7 +929,7 @@ void ui_draw_splash(const char *board_name, const char *version, const char *lin
 	const ui_layout_t *L = &ui_layout;
 	gfx_clear(ui_col.bg);
 
-	const char *word = "C4FMFoundry";
+	const char *word = "DM32-M6OER";	// the build's name (README; About keeps where it comes from)
 	const font_t *wf = gfx_text_width(L->large, word) <= w - 4 ? L->large :
 		gfx_text_width(L->medium, word) <= w - 4 ? L->medium : L->small;
 	// The owner's lines (the CPS boot text): as large as fits, never dropped
