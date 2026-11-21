@@ -847,13 +847,13 @@ static void draw_mark(int cx, int cy, int r)
 	}
 }
 
-// The wordmark: "C4FM" in the accent color, "Foundry" in the text color, centered; returns its height
+// The wordmark: "DM32" in the accent color, "-M6OER" in the text color, centered; returns its height
 static int draw_wordmark(const font_t *f, int y)
 {
-	int w1 = gfx_text_width(f, "C4FM") + 1, w = w1 + gfx_text_width(f, "Foundry");
+	int w1 = gfx_text_width(f, "DM32"), w = w1 + gfx_text_width(f, "-M6OER");
 	int x = (gfx_width() - w) / 2;
-	gfx_text(f, x, y, "C4FM", gfx_bpp() == 1 ? ui_col.fg : AMBER);
-	gfx_text(f, x + w1, y, "Foundry", ui_col.fg);
+	gfx_text(f, x, y, "DM32", gfx_bpp() == 1 ? ui_col.fg : AMBER);
+	gfx_text(f, x + w1, y, "-M6OER", ui_col.fg);
 	return f->h;
 }
 
@@ -865,16 +865,16 @@ void ui_set_splash_call(const char *call)
 	str_copy(splash_call, sizeof splash_call, call != NULL ? call : "");
 }
 
-// The boot picture (tools/splash_logo.py) with the callsign under it, on a display with room for it (a color one):
-// false where it doesn't fit, for the drawn mark and name instead
+// The boot picture (tools/splash_logo.py) with the callsign under it, on any color display: scaled down (nearest
+// pixel) to the room left by the text and the safe area, so a bezel inset never drops it for the drawn mark. False on
+// a 1 bpp panel or one too small for a picture worth showing
 static bool draw_logo_splash(const char *board_name, const char *version, const char *line1, const char *line2)
 {
 	int w = gfx_width(), h = gfx_height();
 	const ui_layout_t *L = &ui_layout;
 	const int n = SPLASH_LOGO_SIZE;
-	if (gfx_bpp() == 1 || w < n + 8 || h < n + L->large->h + 2 * L->small->h + L->tiny->h + 12)
+	if (gfx_bpp() == 1)
 		return false;
-	gfx_clear(RGB565(0, 0, 0));
 	const color_t red = RGB565(220, 24, 24), grey = splash_logo_palette[1];
 	const font_t *ff = L->tiny;
 	char foot[48];
@@ -894,19 +894,29 @@ static bool draw_logo_splash(const char *board_name, const char *version, const 
 	const char *lines[2] = { line1 != NULL ? line1 : "", line2 != NULL ? line2 : "" };
 	const font_t *lf = L->small;
 	int text_h = (cf != NULL ? cf->h + 4 : 0) + ((lines[0][0] != '\0') + (lines[1][0] != '\0')) * lf->h;
-	int y = (foot_y - n - 6 - text_h) / 2;
+	// The picture's side: the full size where it fits, else what the width and the height leave
+	int s = n;
+	if (s > w)
+		s = w;
+	if (s > foot_y - 6 - text_h)
+		s = foot_y - 6 - text_h;
+	if (s < 48)
+		return false;
+	gfx_clear(RGB565(0, 0, 0));
+	int y = (foot_y - s - 6 - text_h) / 2;
 	if (y < 0)
 		y = 0;
-	int x0 = (w - n) / 2;
-	for (int py = 0; py < n; py++) {
-		const uint8_t *row = &splash_logo_pixels[py * n / 2];
-		for (int px = 0; px < n; px++) {
-			uint8_t i = (uint8_t)(px & 1 ? row[px / 2] & 0x0Fu : row[px / 2] >> 4);
+	int x0 = (w - s) / 2;
+	for (int py = 0; py < s; py++) {
+		const uint8_t *row = &splash_logo_pixels[(py * n / s) * n / 2];
+		for (int px = 0; px < s; px++) {
+			int sx = px * n / s;
+			uint8_t i = (uint8_t)(sx & 1 ? row[sx / 2] & 0x0Fu : row[sx / 2] >> 4);
 			if (i != 0)	// 0 is black: cleared already
 				gfx_pixel(x0 + px, y + py, splash_logo_palette[i]);
 		}
 	}
-	y += n + 6;
+	y += s + 6;
 	if (cf != NULL) {
 		gfx_text(cf, (w - gfx_text_width(cf, splash_call)) / 2, y, splash_call, red);
 		y += cf->h + 4;
@@ -999,8 +1009,8 @@ void ui_draw_splash(const char *board_name, const char *version, const char *lin
 		int sw = side_w, ww = gfx_text_width(wf, word);
 		int x0 = (w - sw - ww) / 2, row_h = 2 * side_r > wf->h ? 2 * side_r : wf->h;
 		draw_mark(x0 + (sw - 4) / 2, y + row_h / 2, side_r);
-		gfx_text(wf, x0 + sw, y + (row_h - wf->h) / 2, "C4FM", gfx_bpp() == 1 ? ui_col.fg : AMBER);
-		gfx_text(wf, x0 + sw + gfx_text_width(wf, "C4FM") + 1, y + (row_h - wf->h) / 2, "Foundry", ui_col.fg);
+		gfx_text(wf, x0 + sw, y + (row_h - wf->h) / 2, "DM32", gfx_bpp() == 1 ? ui_col.fg : AMBER);
+		gfx_text(wf, x0 + sw + gfx_text_width(wf, "DM32"), y + (row_h - wf->h) / 2, "-M6OER", ui_col.fg);
 		y += row_h;
 	} else
 		y += draw_wordmark(wf, y);

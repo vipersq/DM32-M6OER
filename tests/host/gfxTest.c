@@ -395,6 +395,34 @@ static void test_splash_footer(void)
 	ui_layout_init();
 }
 
+// The boot picture shows on a color display with a bezel inset (240x320, 10 px off each side): it scales into the
+// room left, never falls back to the drawn mark (its gold body)
+static void test_splash_logo_inset(void)
+{
+#if GFX_MAX_ROWS >= 320
+	hal_display_t d = disp;
+	d.width = 240; d.height = 320; d.bpp = 4;
+	d.flush_indexed = d_flush_indexed;
+	d.inset_left = d.inset_right = 10; d.inset_top = 5; d.inset_bottom = 0;
+	CHECK(gfx_init(&d));
+	ui_layout_init();
+	ui_set_splash_call("M6OER");
+	ui_draw_splash("Radio", "v1.0.0", "Line one", "Line two");
+	int gold = 0, red = 0;
+	for (int y = 0; y < gfx_height(); y++)
+		for (int x = 0; x < gfx_width(); x++) {
+			color_t c = gfx_get_pixel(x, y);
+			gold += c == RGB565(255, 196, 44);
+			red += c == RGB565(220, 24, 24);
+		}
+	CHECK(gold == 0);
+	CHECK(red > 0);
+	ui_set_splash_call("");
+	gfx_init(&disp);
+	ui_layout_init();
+#endif
+}
+
 static void test_aa_text(void)
 {
 	// RGB565: edges are blends between the text and what is under it
@@ -667,6 +695,7 @@ int main(void)
 	test_indexed();
 	test_aa_text();
 	test_splash_footer();
+	test_splash_logo_inset();
 	test_pass_wait();
 	test_idle_pill_contrast();
 	test_big_text();
