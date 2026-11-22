@@ -280,6 +280,9 @@ size_t aprs_host_output(uint8_t *out, size_t max);
 // ends the alert (RadioLink: a 911 Alert in ATAK). false with KISS off: nobody to tell
 bool aprs_host_sos(bool on);
 bool aprs_host_sos_on(void);
+// A SetHardware frame for the host (data starts with its tag), whole or not at all; false with KISS off or the ring
+// full (the voice over the host port, aprs.md 9.5)
+bool aprs_host_emit_hw(const uint8_t *data, size_t n);
 #else
 static inline bool aprs_host_sos(bool on) { (void)on; return false; }
 static inline bool aprs_host_sos_on(void) { return false; }

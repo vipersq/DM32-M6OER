@@ -14,6 +14,7 @@
 #if CONFIG_DATALINK_DMR
 #include "aprs/kiss.h"		// the data link test reads the host's stream
 #include "aprs/aprs_host.h"	// ... and writes to it
+#include "aprs/aprs_voice.h"
 #endif
 #endif
 #include "radio/radio_sfr.h"
@@ -3386,6 +3387,61 @@ static int dlink_air(unsigned first, uint8_t *payload, int *length)
 // The data link over DMR (docs/spec/aprs.md 9.2): KISS data mode's host frames go out as DMR data on the channel's
 // talkgroup, with the same queue reports as FM; frames from other radios' data links come back to the host; off a
 // DMR channel nothing is taken and the status answer says why
+#if CONFIG_KISS_VOICE
+// The last SetHardware 'V' 'T' in a host stream: 1 the transmitter is on, 0 off, -1 none
+static int voice_t(const uint8_t *o, size_t n)
+{
+	int on = -1;
+	for (size_t i = 0; i + 4 < n; i++) {
+		if (o[i] == KISS_FEND && o[i + 1] == KISS_CMD_SETHW && o[i + 2] == KISS_TAG_VOICE && o[i + 3] == 'T') {
+			on = o[i + 4];
+		}
+	}
+	return on;
+}
+
+// DMR voice over the host port (aprs.md 9.5) on the real radio core: the host's key transmits, and a host that goes
+// quiet is unkeyed by the radio task's own watchdog too
+static void test_kiss_voice(void)
+{
+	static uint8_t out[2048];
+	aprs_cfg_t c;
+
+	boot();
+	dmr_start(true);
+	aprs_get_cfg(&c);
+	c.kiss = true;
+	aprs_set_cfg(&c, now);
+	run(100);
+	dlink_host(out, sizeof out);
+
+	uint8_t key[] = { KISS_CMD_SETHW, KISS_TAG_VOICE, 'K' };
+	aprs_host_kiss_frame(key, sizeof key, now);
+	CHECK(aprs_voice_tx_on());
+	run(200);
+	CHECK(sm.ptt && sm.host_audio && sm.view.state == RS_TX);
+	aprs_voice_pump(now);
+	size_t n = dlink_host(out, sizeof out);
+	CHECK(voice_t(out, n) == 1);
+
+	// No audio from the host: off within a second and a bit, from either side's watchdog
+	run(KISS_VOICE_STALE_MS + 200);
+	aprs_voice_pump(now);
+	CHECK(!sm.ptt && sm.view.state != RS_TX);
+	run(100);
+	aprs_voice_pump(now);
+	n = dlink_host(out, sizeof out);
+	CHECK(voice_t(out, n) == 0 && !aprs_voice_tx_on());
+
+	// Done: unkeyed, KISS off again for the tests after this one
+	uint8_t un[] = { KISS_CMD_SETHW, KISS_TAG_VOICE, 'U' };
+	aprs_host_kiss_frame(un, sizeof un, now);
+	c.kiss = false;
+	aprs_set_cfg(&c, now);
+	run(100);
+}
+#endif
+
 static void test_datalink_dmr(void)
 {
 	static uint8_t out[2048], fr[AX25_FRAME_MAX], got[AX25_FRAME_MAX + 8];
@@ -3924,6 +3980,7 @@ static void test_ui_requests(void)
 uint32_t hal_millis(void) { return now; }
 void hal_delay_ms(uint32_t ms) { now += ms; }	// the PA sweep op's wait
 void radio_get_view(radio_view_t *v) { *v = sm.view; }
+void radio_req_ptt_host(bool down) { req(RREQ_PTT, down ? 2 : 0); }
 uint32_t radio_view_serial(void) { return sm.serial; }
 void radio_get_settings(radio_settings_t *s) { *s = sm.set; }
 void radio_set_settings(const radio_settings_t *s) { radio_sm_set_settings(&sm, s, now); }
@@ -10995,6 +11052,9 @@ int main(void)
 	test_aprs_dmr_beacon();
 #if CONFIG_DATALINK_DMR
 	test_datalink_dmr();
+#if CONFIG_KISS_VOICE
+	test_kiss_voice();
+#endif
 #endif
 #endif
 #if CONFIG_APRS_RX

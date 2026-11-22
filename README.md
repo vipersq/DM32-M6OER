@@ -28,7 +28,7 @@ It is built on [RadioFoundry C4FM](https://github.com/lycanananas/RadioFoundryC4
 | Audio | 17 roger beeps (including a CB two-tone) with volume and tail; a mic compressor and a stronger mic level |
 | Tactical | key-up, unkey, RX and RX end tones (single, double or triple, adjustable volume), a red tactical screen, side key functions |
 | Screen | your own boot picture with your callsign; Quick pages per mode; dual watch with both channels on screen |
-| Data | APRS with messaging and SmartBeaconing; a KISS TNC on the programming cable; Tools > Data link for [RadioLink](https://github.com/vipersq/RadioLink) (ATAK over radio): in FM on a frequency of its own, or as DMR data on a DMR channel's talkgroup |
+| Data | APRS with messaging and SmartBeaconing; a KISS TNC on the programming cable; Tools > Data link for [RadioLink](https://github.com/vipersq/RadioLink) (ATAK over radio): in FM on a frequency of its own, or as DMR data on a DMR channel's talkgroup; DMR voice through the phone (its microphone and speaker over the same cable, [aprs.md 9.5](docs/spec/aprs.md#95-dmr-voice-over-the-host-port)) |
 
 What changed in this build, in detail: [docs/spec/c4fm.md](docs/spec/c4fm.md).
 

@@ -8326,7 +8326,7 @@ static void reload(radio_sm_t *sm, uint32_t now_ms)
 	}
 }
 
-#if CONFIG_NET_USRP
+#if CONFIG_NET_USRP || CONFIG_KISS_VOICE
 // A host transmission whose audio stopped coming ends here too: the network service's own watchdog doesn't run while
 // the USB link isn't in network mode (a personality switch mid-transmission)
 static void host_audio_watch(radio_sm_t *sm, uint32_t now_ms)
@@ -8746,7 +8746,7 @@ void radio_sm_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 		if (req->arg != 0) {
 			if (!sm->ptt) {
 				sm->host_audio = req->arg == 2;	// a transmission keeps the source it started with
-#if CONFIG_NET_USRP
+#if CONFIG_NET_USRP || CONFIG_KISS_VOICE
 				sm->host_pushes = audio_mux_host_pushes();
 				sm->host_push_ms = now_ms;
 #endif
@@ -9617,7 +9617,7 @@ void radio_sm_poll(radio_sm_t *sm, uint32_t now_ms)
 #if CONFIG_NET_USRP || CONFIG_APRS_RX
 	audio_mux_service(now_ms);	// the stream for a host audio session or APRS (after the beep: it may have stopped it)
 #endif
-#if CONFIG_NET_USRP
+#if CONFIG_NET_USRP || CONFIG_KISS_VOICE
 	host_audio_watch(sm, now_ms);
 #endif
 #if CONFIG_APRS

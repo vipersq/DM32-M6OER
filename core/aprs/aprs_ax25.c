@@ -1440,6 +1440,19 @@ bool aprs_host_sos_on(void)
 	return on;
 }
 
+bool aprs_host_emit_hw(const uint8_t *data, size_t n)
+{
+	LOCK();
+	bool ok = aprs_s.cfg.kiss;
+	if (ok) {
+		uint32_t before = aprs_s.v.host_out;
+		host_emit(KISS_CMD_SETHW, data, n);
+		ok = aprs_s.v.host_out != before;
+	}
+	UNLOCK();
+	return ok;
+}
+
 bool aprs_host_sos(bool on)
 {
 	LOCK();

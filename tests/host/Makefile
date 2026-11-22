@@ -381,6 +381,7 @@ radioCoreTestP25Nxdn: $(RCP25NX) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE
 # The same with APRS: what the data service hears goes into the station list (a DMR APRS position, docs/spec/aprs.md 8.2)
 TESTS   += radioCoreTestAprs
 RCAPRS  := $(RCORE) $(CORE)/aprs/aprs.c $(CORE)/aprs/aprs_ax25.c $(CORE)/aprs/aprs_dmr.c $(CORE)/aprs/aprs_dlink_dmr.c $(CORE)/aprs/aprs_host.c $(APRSLIB) \
+           $(CORE)/aprs/aprs_voice.c $(CORE)/aprs/adpcm.c $(CORE)/hostlink/hostlink_view.c \
            $(CORE)/usbaudio/audio_mux.c $(CORE)/usbaudio/pcm_slip.c
 radioCoreTestAprs: $(RCAPRS) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/call/*.h) $(CORE)/dmr/dmrDataService.h \
                    $(CORE)/ui/ui_svc.h $(wildcard $(CORE)/aprs/*.h)
@@ -1688,10 +1689,20 @@ TESTS   += usrpNetTest
 usrpNetTest: $(UNET) $(wildcard $(CORE)/usbaudio/*.h)
 	$(CC) $(CFLAGS) $(CORE_HAL) -DCONFIG_NET_USRP=1 -o $@ $(UNET) -lm
 
+# DMR voice over the host port (core/aprs/aprs_voice.c, adpcm.c, docs/spec/aprs.md 9.5) against the real shared PCM
+# stream and a fake board, radio core and KISS output
+KVOICE  := kissVoiceTest.c $(CORE)/aprs/aprs_voice.c $(CORE)/aprs/adpcm.c $(CORE)/hostlink/hostlink_view.c \
+           $(CORE)/usbaudio/audio_mux.c $(CORE)/usbaudio/pcm_slip.c
+TESTS   += kissVoiceTest
+
+kissVoiceTest: $(KVOICE) $(CORE)/aprs/aprs_voice.h $(CORE)/aprs/adpcm.h $(wildcard $(CORE)/usbaudio/*.h)
+	$(CC) $(CFLAGS) $(CORE_HAL) -DCONFIG_KISS_VOICE=1 -o $@ $(KVOICE) -lm
+
 run: run-usbaudio
-run-usbaudio: usrpTest usrpNetTest
+run-usbaudio: usrpTest usrpNetTest kissVoiceTest
 	./usrpTest
 	./usrpNetTest
+	./kissVoiceTest
 .PHONY: run-usbaudio
 
 # The minimal TCP (core/net/tcp.c) against a scripted peer; tshark checks the segments it wrote to tcpTest.pcap

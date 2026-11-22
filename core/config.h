@@ -314,6 +314,11 @@
 #ifndef CONFIG_DATALINK_DMR
 #define CONFIG_DATALINK_DMR		(CONFIG_APRS_AFSK && CONFIG_APRS_DMR)
 #endif
+// DMR voice over the host port (aprs.md 9.5): the host's microphone and speaker as KISS frames of ADPCM. It needs
+// the KISS TNC on the host link, DMR and the shared PCM stream; one host audio session at a time, so not with USRP
+#ifndef CONFIG_KISS_VOICE
+#define CONFIG_KISS_VOICE		(CONFIG_DATALINK_DMR && CONFIG_APRS_RX && CONFIG_HOSTLINK && !CONFIG_NET_USRP)
+#endif
 // C4FM DN voice (the GPL fork's core/c4fm, docs/spec/c4fm.md): a radio mode beside FM, sharing DMR's codec glue
 #ifndef CONFIG_C4FM
 #define CONFIG_C4FM			0

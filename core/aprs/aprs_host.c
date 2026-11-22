@@ -12,7 +12,9 @@
 #endif
 #if CONFIG_HOSTLINK
 #include "hostlink/hostlink.h"
+#include "hal_time.h"
 #endif
+#include "aprs/aprs_voice.h"
 
 // Without the AX.25 half (CONFIG_APRS_AFSK) there is no TNC: the port takes only NMEA lines, the position for
 // reports over DMR
@@ -67,6 +69,11 @@ void aprs_host_kiss_frame(const uint8_t *f, size_t n, uint32_t now_ms)
 			aprs_dlink_dmr_text(id, f[7] != 0, (const char *)f + 8, n - 8u);
 		}
 #endif
+#if CONFIG_KISS_VOICE
+		else if (n >= 3 && f[1] == KISS_TAG_VOICE) {
+			aprs_voice_hw(f + 2, n - 2u, now_ms);	// voice over the host port (aprs.md 9.5)
+		}
+#endif
 		break;
 	default:
 		break;		// TXDELAY, persistence, slot time: the radio's own settings and CSMA apply (aprs.md 9)
@@ -109,11 +116,18 @@ void aprs_host_feed(const uint8_t *buf, size_t len, uint32_t now_ms)
 }
 
 #if CONFIG_HOSTLINK
+// Each pass of the host link task asks for output: the voice's receive audio is made then, in that task
+static size_t tnc_output(uint8_t *out, size_t max)
+{
+	aprs_voice_pump(hal_millis());
+	return aprs_host_output(out, max);
+}
+
 static const hostlink_tnc_t tnc = {
 	.claims = aprs_host_claims,
 	.feed = aprs_host_feed,
 	.in_frame = aprs_host_in_frame,
-	.output = aprs_host_output,
+	.output = tnc_output,
 };
 
 void aprs_host_start(void)

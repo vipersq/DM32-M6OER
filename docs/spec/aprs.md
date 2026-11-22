@@ -437,6 +437,36 @@ change. Host tests: `radioCoreTestAprs` (`test_datalink_dmr`: a relayed frame ta
 on and off, a position and a text to the host, the host's text on air), `dmrDataServiceTest` (the inbox's text hook),
 `keyassignTest` (204: long press only).
 
+### 9.5 DMR voice over the host port
+
+`CONFIG_KISS_VOICE` (on with the data link over DMR, the APRS receiver and the host link, off with USRP: one host
+audio session at a time). The host is the microphone and speaker for the radio's DMR channel; the radio keeps the
+vocoder, so AMBE never crosses the port. Audio is IMA ADPCM (`core/aprs/adpcm.c`): 8 kHz, 4 bits a sample, 20 ms a
+frame, half duplex. A frame is 83 bytes: the predictor (16 bits, little-endian) and step index at its start, then two
+samples a byte, the first in the low nibble. Each frame decodes alone, so a lost one is a 20 ms gap. One direction
+is about 4.3 kB/s with KISS framing, 37% of the 115200 baud port; data frames share the rest.
+
+Frames are SetHardware `V`, then a kind:
+
+| Direction | Kind | Payload |
+|---|---|---|
+| from the host | `R` | 1 receive audio on, 0 off. Off at power-on: a data-only host gets none |
+| from the host | `K` | key: transmit on the channel's talk target with the host's audio (`radio_req_ptt_host`) |
+| from the host | `U` | unkey |
+| from the host | `A` | one ADPCM frame of transmit audio; dropped unless keyed |
+| to the host | `A` | one ADPCM frame of the call playing (`AUDIO_MUX_RX_OUTPUT`, what the speaker gets), while receive audio is on and we aren't transmitting |
+| to the host | `C` | a call started playing (`RDMR_RX`): source and destination IDs (32 bits each, big-endian), 1 group / 0 private, the caller's name |
+| to the host | `E` | the call ended |
+| to the host | `T` | the transmitter: 1 on / 0 off, why a key was refused (0 OK, 1 not a DMR channel, 2 hotspot, 3 no vocoder), 1 the host keyed it / 0 the radio's own PTT |
+
+The host's samples replace the microphone's on the way to the encoder (`audio_mux_host_tx`); the radio's own PTT
+still works and the host sees it as `T` with 0. A keyed host whose audio stops is unkeyed after 1 s
+(`KISS_VOICE_STALE_MS`) by the module, and by the radio task's host audio watchdog as for USRP. The module runs in the
+host link task (`aprs_voice_pump` on each pass) and reads the radio view every 40 ms only while a session is open.
+KISS must be on (Tools > APRS > KISS on USB). Host tests: `kissVoiceTest` (ADPCM quality and loss, refusals, receive
+and transmit against the shared PCM stream, the stale watchdog), `radioCoreTestAprs` (`test_kiss_voice`: the key on
+the real radio core, both watchdogs).
+
 ## 10. UI
 
 Tools > APRS (`ui_aprs.c`): the body shows the callsign and frequency, why nothing can be sent (no callsign, no
