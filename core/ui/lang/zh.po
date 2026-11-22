@@ -989,7 +989,7 @@ msgctxt "APRS_VALUE_AS_CHANNEL"
 msgid "As channel"
 msgstr "按信道"
 
-#: core/ui/ui_aprs.c
+#: core/ui/ui_aprs.c core/ui/ui_menus.c
 msgctxt "APRS_VALUE_KISS_DATA"
 msgid "Data"
 msgstr "数据"
@@ -1018,6 +1018,61 @@ msgstr "本机无法接收 APRS"
 msgctxt "HINT_0_9_PICK_BACK"
 msgid "0-9 pick  Back"
 msgstr "0-9 选  返回"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_BODY_SET_DATA"
+msgid "Set KISS on USB to Data for RadioLink (ATAK)."
+msgstr "USB KISS 设为数据，用于 RadioLink (ATAK)。"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_BODY_HOW_TO_SET"
+msgid "Tune the data frequency (FM), then press 2 here."
+msgstr "调到数据频率 (FM)，然后在此按 2。"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_BODY_LISTENING"
+msgid "Sending and listening here."
+msgstr "在此发送和接收。"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_BODY_SEND_ONLY"
+msgid "Sending. To receive, tune an FM channel or the VFO here."
+msgstr "发送中。接收时请把 FM 信道或 VFO 调到此频率。"
+
+#: core/ui/ui_aprs.c core/ui/ui_menus.c
+msgctxt "CHAN_LABEL_BANDWIDTH"
+msgid "Bandwidth"
+msgstr "带宽"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_VALUE_AS_APRS"
+msgid "As APRS"
+msgstr "同 APRS"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_TOAST_AS_APRS"
+msgid "Data link: APRS frequency"
+msgstr "数据连接：APRS 频率"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_TOAST_TUNE_FM"
+msgid "Tune an FM channel or the VFO first"
+msgstr "请先调到 FM 信道或 VFO"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_TOAST_FREQ_SET"
+msgid "Data link: this frequency"
+msgstr "数据连接：此频率"
+
+#: core/ui/ui_aprs.c core/ui/ui_menus.c
+msgctxt "TITLE_DATA_LINK"
+msgid "Data link"
+msgstr "数据连接"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_HINT"
+msgid "1-3 pick  Hold 2: as APRS"
+msgstr "1-3 选择  长按 2：APRS"
 
 #: core/ui/ui_aprs.c
 msgctxt "APRS_TITLE_HEARD"
@@ -2253,11 +2308,6 @@ msgstr "速率"
 msgctxt "WORD_RX_ONLY"
 msgid "RX only"
 msgstr "仅接收"
-
-#: core/ui/ui_menus.c
-msgctxt "CHAN_LABEL_BANDWIDTH"
-msgid "Bandwidth"
-msgstr "带宽"
 
 #: core/ui/ui_menus.c
 msgctxt "CHAN_LABEL_RX_TONE"

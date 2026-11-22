@@ -4,7 +4,7 @@
 # The C4FM build's menus (docs/spec/c4fm.md 6) in the simulator built with CONFIG_C4FM (uiSimC4fm): each page and
 # screen opens and draws at every display class. Menu: 0 Switch to VFO/Memory, 1 Zones, 2 Channels, 3 This channel,
 # 4 Calls, 5 Wires-X, 6 Tools, 7 Settings. Settings: 1 Sound, 2 Roger & tones, 3 Display, 4 Tactical, 5 Talk & voice,
-# 6 My radio, 7 Modes, 8 Location, 9 Battery & keys, 0 Advanced. Calls: Last caller, Recent DMR, Last heard C4FM,
+# 6 My radio, 7 Modes, 8 Location, 9 Battery & keys, 0 Advanced. Tools ends with Data link. Calls: Last caller, Recent DMR, Last heard C4FM,
 # Contacts, Messages
 set -e
 fail=0
@@ -40,5 +40,8 @@ check "ok 7 6 down ok" c4fm-call
 check "ok 7 7 down down down down down ok" group
 check "ok 1" zones
 check "ok 6" tools
+# Tools > Data link (the last tool): KISS mode, its frequency, bandwidth
+check "ok 6 up ok" datalink
+check "ok 6 up ok 1 1 3" datalink
 check "ok ok" home
 [ $fail = 0 ] && echo "c4fmUiSmoke: passed" || { echo "c4fmUiSmoke: FAILED"; exit 1; }

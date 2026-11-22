@@ -349,6 +349,12 @@ Port 0 only. DATA frames are checked (section 3) and queued for RF; TXDELAY, PER
 ignored (the engine's own CSMA applies); SetHardware 'G' carries an APRS-IS line, 'N' an NMEA sentence. To the host:
 received frames (RX builds) as KISS DATA, and lines for APRS-IS as SetHardware 'G'.
 
+**Data link (Tools > Data link).** Data mode has a frequency and a bandwidth of its own (`settings_t.data_hz`, 0: the
+APRS frequency; `SETTINGS_APRS2_DATA_WIDE`, else 12.5 kHz). The host's frames go out there, APRS's own frames on the
+APRS frequency, never in one transmission (`aprs_rf_take` takes the frames queued for the first frame's frequency).
+The radio also listens there for the host, with APRS receive on or off, while an FM channel or the VFO is tuned to
+it. The screen sets the frequency from the one the radio is on (2; held: back to APRS's) and says whether it listens.
+
 **Data mode.** "KISS on USB" steps Off, On, Data. Data is for a frequency of the user's own (a data link such as an
 ATAK bridge), not the APRS network: host frames skip the burst rule (section 3) and are limited by the queue (4
 frames) and CSMA alone; the callsign and amateur-frequency rules still apply. After each change the host gets

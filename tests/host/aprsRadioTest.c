@@ -969,6 +969,84 @@ static void test_kiss_data_mode(void)
 	CHECK(!any_q);
 }
 
+// Tools > Data link: KISS data mode's frames go out on its own frequency, beacons stay on APRS's, never in one
+// transmission; the radio listens on the data frequency for the host even with APRS receive off
+#define DATA_HZ		144950000u
+static void test_data_link_freq(void)
+{
+	reset();
+	aprs_set_test_call("Q1TST");
+	configure(0, false);
+	aprs_cfg_t c;
+	aprs_get_cfg(&c);
+	c.kiss = c.kiss_data = true;
+	c.data_hz = DATA_HZ;
+	aprs_set_cfg(&c, now);
+	run(100);
+	aprs_view_t v;
+	aprs_get_view(&v);
+	CHECK(v.data_hz == DATA_HZ && v.data_block == APRS_OK && v.freq_hz == APRS_HZ);
+	ax25_frame_t f;
+	uint8_t frame[AX25_FRAME_MAX];
+	const char *line = "Q1TST-9>TAKRF,NOGATE:{TA data";
+	CHECK(ax25_from_tnc2(line, strlen(line), &f));
+	f.dst.h = true;
+	size_t n = ax25_encode(&f, frame, sizeof(frame));
+	// The host's frame and a beacon, queued together: two transmissions, each on its frequency
+	int starts = hw.starts;
+	CHECK(aprs_host_frame(frame, n, now));
+	CHECK(aprs_send_now());
+	CHECK(wait_start(starts + 1, 5000));
+	CHECK(hw.tx_hz == DATA_HZ);
+	wait_idle();
+	CHECK(wait_start(starts + 2, 15000));
+	CHECK(hw.tx_hz == APRS_HZ);
+	wait_idle();
+	// Not an amateur frequency: refused at the door, and the status query says why
+	c.data_hz = 100100000u;
+	aprs_set_cfg(&c, now);
+	run(100);
+	CHECK(!aprs_host_frame(frame, n, now));
+	// No own frequency: the data link uses APRS's
+	c.data_hz = 0;
+	aprs_set_cfg(&c, now);
+	run(100);
+	aprs_get_view(&v);
+	CHECK(v.data_hz == APRS_HZ);
+	starts = hw.starts;
+	CHECK(aprs_host_frame(frame, n, now));
+	CHECK(wait_start(starts + 1, 15000));
+	CHECK(hw.tx_hz == APRS_HZ);
+	wait_idle();
+}
+
+// Receive on the data link's frequency: in KISS data mode, with APRS receive off
+static void test_data_link_rx(void)
+{
+	fake_tap.caps = AUDIO_TAP_FM_RX;
+	memset(&pcm, 0, sizeof(pcm));
+	reset();
+	aprs_cfg_t c;
+	aprs_get_cfg(&c);
+	c.rx_on = false;
+	c.kiss = c.kiss_data = true;
+	c.data_hz = DATA_HZ;
+	aprs_set_cfg(&c, now);
+	chan.rx_hz = chan.tx_hz = DATA_HZ;
+	settings_init();
+	radio_sm_init(&sm, now);
+	aprs_set_cfg(&c, now);
+	run(300);
+	CHECK(aprs_rx_listening());
+	// KISS data mode off: nothing to listen for there
+	c.kiss_data = false;
+	aprs_set_cfg(&c, now);
+	run(300);
+	CHECK(!aprs_rx_listening());
+	chan.rx_hz = chan.tx_hz = CH_HZ;
+	fake_tap.caps = 0;
+}
+
 // The last try's ack wait ends while the frequency is blocked: the message is over, not pending forever
 static void test_message_ends_blocked(void)
 {
@@ -1974,6 +2052,8 @@ int main(void)
 	test_tx_power_own();
 	test_host_kiss_nmea();
 	test_kiss_data_mode();
+	test_data_link_freq();
+	test_data_link_rx();
 	test_messages();
 	test_message_ends_blocked();
 	test_third_party_messages();

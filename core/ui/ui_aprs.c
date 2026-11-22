@@ -320,6 +320,126 @@ const ui_scr_def_t ui_aprs_screen = {
 	.count = aprs_count, .item = aprs_item, .select = aprs_select, .body = aprs_body,
 };
 
+// --- Tools > Data link (KISS data mode, aprs.md 9): a link of the user's own, such as RadioLink for ATAK ---
+// KISS on USB (the same setting as APRS's row), the data frequency (the channel's or the VFO's, taken with one key; held:
+// back to APRS's) and its bandwidth. The body says whether the radio listens there: only on an FM channel tuned to it
+
+#if CONFIG_APRS_AFSK
+enum { DL_KISS, DL_FREQ, DL_WIDTH, DL_COUNT };
+
+static const char *datalink_body(void)
+{
+	static char t[200];
+	aprs_view_t v;
+	aprs_cfg_t c;
+	if (!ui_svc_aprs_view(&v)) {
+		return TR(WHY_APRS_NOT_IN_BUILD, "APRS: not in this build");
+	}
+	ui_svc_aprs_cfg(&c);
+	sbuf_t b;
+	sb_init(&b, t, sizeof t);
+	if (!c.kiss || !c.kiss_data) {
+		sb_str(&b, TR(DATALINK_BODY_SET_DATA, "Set KISS on USB to Data for RadioLink (ATAK)."));
+		return t;
+	}
+	if (c.data_hz == 0) {
+		// No frequency of its own yet: how to set one (APRS's is the network's, not for a data link)
+		sb_str(&b, TR(DATALINK_BODY_HOW_TO_SET, "Tune the data frequency (FM), then press 2 here."));
+		return t;
+	}
+	sb_freq(&b, v.data_hz);
+	sb_str(&b, c.data_wide ? " 25 kHz" : " 12.5 kHz");
+	sb_str(&b, "  ");
+	if (v.data_block != APRS_OK) {
+		sb_str(&b, why_text(v.data_block));
+	} else if (ui_view()->ch.mode == RADIO_MODE_FM && ui_view()->ch.rx_hz == v.data_hz) {
+		sb_str(&b, TR(DATALINK_BODY_LISTENING, "Sending and listening here."));
+	} else {
+		sb_str(&b, TR(DATALINK_BODY_SEND_ONLY, "Sending. To receive, tune an FM channel or the VFO here."));
+	}
+	return t;
+}
+
+static uint16_t datalink_count(void) { return DL_COUNT; }
+
+static void datalink_item(uint16_t i, ui_item_t *it)
+{
+	static const tr_id_t names[] = { TRN(APRS_LABEL_KISS_ON_USB, "KISS on USB"),
+		TRN(APRS_LABEL_FREQUENCY, "Frequency"), TRN(CHAN_LABEL_BANDWIDTH, "Bandwidth") };
+	if (i >= DL_COUNT) {
+		return;
+	}
+	aprs_cfg_t c;
+	ui_svc_aprs_cfg(&c);
+	it->num = (char)('1' + i);
+	str_copy(it->label, sizeof it->label, tr(names[i]));
+	sbuf_t b;
+	sb_init(&b, it->value, sizeof it->value);
+	switch (i) {
+	case DL_KISS:
+		sb_str(&b, !c.kiss ? TR(VALUE_OFF, "Off") : c.kiss_data ? TR(APRS_VALUE_KISS_DATA, "Data") : TR(VALUE_ON, "On"));
+		break;
+	case DL_FREQ:
+		if (c.data_hz == 0) {
+			sb_str(&b, TR(DATALINK_VALUE_AS_APRS, "As APRS"));
+		} else {
+			sb_freq(&b, c.data_hz);
+		}
+		break;
+	case DL_WIDTH: sb_str(&b, c.data_wide ? "25 kHz" : "12.5 kHz"); break;
+	default: break;
+	}
+}
+
+static void datalink_select(uint16_t i, bool hold)
+{
+	aprs_view_t v;
+	aprs_cfg_t c;
+	if (!ui_svc_aprs_view(&v)) {
+		ui_toast(TR(WHY_APRS_NOT_IN_BUILD, "APRS: not in this build"));
+		return;
+	}
+	ui_svc_aprs_cfg(&c);
+	switch (i) {
+	case DL_KISS:
+		if (!c.kiss) {
+			c.kiss = true;
+			c.kiss_data = false;
+		} else if (!c.kiss_data) {
+			c.kiss_data = true;
+		} else {
+			c.kiss = c.kiss_data = false;
+		}
+		break;
+	case DL_FREQ: {
+		// The frequency the radio is on now (a channel or the VFO, in FM): one key, no digits to type. Held: APRS's
+		const radio_view_t *rv = ui_view();
+		if (hold) {
+			c.data_hz = 0;
+			ui_toast(TR(DATALINK_TOAST_AS_APRS, "Data link: APRS frequency"));
+		} else if (rv->ch.mode != RADIO_MODE_FM) {
+			ui_toast(TR(DATALINK_TOAST_TUNE_FM, "Tune an FM channel or the VFO first"));
+			return;
+		} else {	// not an amateur frequency: the body says so (data_block)
+			c.data_hz = rv->ch.rx_hz;
+			ui_toast(TR(DATALINK_TOAST_FREQ_SET, "Data link: this frequency"));
+		}
+		break;
+	}
+	case DL_WIDTH: c.data_wide = !c.data_wide; break;
+	default: return;
+	}
+	ui_svc_aprs_set_cfg(&c);
+	ui_dirty();
+}
+
+const ui_scr_def_t ui_datalink_screen = {
+	.name = "datalink", .flags = SF_LIST | SF_NUMBERED | SF_FIELD, .prefix = TRN(TITLE_DATA_LINK, "Data link"),
+	.hint = TRN(DATALINK_HINT, "1-3 pick  Hold 2: as APRS"),
+	.count = datalink_count, .item = datalink_item, .select = datalink_select, .body = datalink_body,
+};
+#endif
+
 // --- Stations heard (receive builds) ---
 
 #if CONFIG_APRS_RX

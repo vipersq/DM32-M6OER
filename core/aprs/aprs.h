@@ -71,6 +71,8 @@ typedef struct {
 	uint32_t dmr_dst;	// destination ID (private call)
 	bool kiss;		// KISS TNC on the host port
 	bool kiss_data;		// data mode: host frames limited only by the queue and CSMA, not the APRS burst rule
+	uint32_t data_hz;	// data mode's frequency (Tools > Data link); 0: the APRS frequency
+	bool data_wide;		// data mode at 25 kHz, else 12.5 kHz
 	bool to_is;		// our beacons to APRS-IS through the host helper
 	bool rx_on;		// receive on the APRS frequency (boards with a receive path)
 	bool igate;		// RF -> APRS-IS
@@ -81,6 +83,8 @@ typedef struct {
 void aprs_cfg_default(aprs_cfg_t *c);
 // The APRS frequency c selects (0 = none)
 uint32_t aprs_cfg_freq(const aprs_cfg_t *c);
+// KISS data mode's frequency: its own, else the APRS frequency
+uint32_t aprs_data_freq(const aprs_cfg_t *c);
 // Frequency of a region (0 for APRS_REGION_CUSTOM)
 uint32_t aprs_region_hz(uint8_t region);
 const char *aprs_region_name(uint8_t region);
@@ -103,6 +107,8 @@ typedef struct {
 	char call[AX25_CALL_LEN + 4];	// "Q0TST-7", "" = none
 	uint8_t block;		// aprs_block_t for RF
 	uint32_t freq_hz;
+	uint32_t data_hz;	// KISS data mode's frequency (its own or the APRS one)
+	uint8_t data_block;	// aprs_block_t on it
 	uint8_t pos_src;	// position_src_t in use
 	bool pos_valid;
 	int32_t lat, lon;

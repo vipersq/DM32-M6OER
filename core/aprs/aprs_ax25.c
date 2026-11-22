@@ -62,6 +62,11 @@ uint32_t aprs_cfg_freq(const aprs_cfg_t *c)
 	return c->region == APRS_REGION_CUSTOM ? c->freq_hz : aprs_region_hz(c->region);
 }
 
+uint32_t aprs_data_freq(const aprs_cfg_t *c)
+{
+	return c->data_hz != 0 ? c->data_hz : aprs_cfg_freq(c);
+}
+
 bool aprs_amateur_hz(uint32_t hz)
 {
 	return (hz >= 144000000u && hz <= 148000000u) || (hz >= 222000000u && hz <= 225000000u) ||
@@ -267,9 +272,9 @@ static bool band_tx(uint32_t hz)
 	return false;
 }
 
-static uint8_t rf_block(void)
+// Why nothing can be sent on hz now
+static uint8_t freq_block(uint32_t hz)
 {
-	uint32_t hz = aprs_cfg_freq(&aprs_s.cfg);
 	if (!aprs_s.me_ok) {
 		return APRS_NO_CALL;
 	}
@@ -283,6 +288,28 @@ static uint8_t rf_block(void)
 		return APRS_NO_AFSK;
 	}
 	return APRS_OK;
+}
+
+static uint8_t rf_block(void)
+{
+	return freq_block(aprs_cfg_freq(&aprs_s.cfg));
+}
+
+// KISS data mode: the host's frames go out on the data link's frequency (Tools > Data link), the rest on APRS's
+static bool data_mode(void)
+{
+	return aprs_s.cfg.kiss && aprs_s.cfg.kiss_data;
+}
+
+static uint32_t frame_hz(const qframe_t *q)
+{
+	return q->kind == K_HOST && data_mode() ? aprs_data_freq(&aprs_s.cfg) : aprs_cfg_freq(&aprs_s.cfg);
+}
+
+// Why the next queued frame can't go now (its own frequency's reason)
+static uint8_t queue_block(void)
+{
+	return aprs_s.qn == 0 ? aprs_s.block : freq_block(frame_hz(&aprs_s.q[0]));
 }
 
 
@@ -409,7 +436,7 @@ void aprs_host_status_query(void)
 	buf[n++] = KISS_TAG_QUEUE;
 	buf[n++] = (uint8_t)(QUEUE_LEN - aprs_s.qn);
 	buf[n++] = KISS_Q_STATUS;
-	buf[n++] = aprs_s.block;
+	buf[n++] = data_mode() ? freq_block(aprs_data_freq(&aprs_s.cfg)) : aprs_s.block;
 	buf[n++] = aprs_s.cfg.kiss_data ? 2u : 1u;
 	for (size_t i = 0; i < AX25_CALL_LEN && aprs_s.me.call[i] != '\0'; i++) {
 		buf[n++] = (uint8_t)aprs_s.me.call[i];
@@ -553,8 +580,10 @@ void aprs_ax25_tick(uint32_t now_ms)
 	}
 #endif
 	uint8_t block = rf_block();
-	if (block != aprs_s.block) {
+	uint8_t dblock = freq_block(aprs_data_freq(&aprs_s.cfg));
+	if (block != aprs_s.block || dblock != aprs_s.v.data_block) {
 		aprs_s.block = block;
+		aprs_s.v.data_block = dblock;
 		aprs_changed();
 	}
 }
@@ -563,6 +592,8 @@ void aprs_ax25_service(void)
 {
 	// This half's view fields first: the returns below leave them set
 	aprs_s.v.freq_hz = aprs_cfg_freq(&aprs_s.cfg);
+	aprs_s.v.data_hz = aprs_data_freq(&aprs_s.cfg);
+	aprs_s.v.data_block = freq_block(aprs_s.v.data_hz);
 	aprs_s.v.block = aprs_s.block;
 	aprs_s.v.msg_pending = aprs_s.out.active;
 	aprs_s.v.msg_tries = aprs_s.out.tries;
@@ -885,8 +916,10 @@ void aprs_ax25_rx_service(const aprs_radio_t *r, uint32_t now_ms)
 {
 	const hal_afsk_t *h = board.afsk;
 	bool own = rx_by_board();
-	bool want = aprs_s.cfg.rx_on && r->fm_rx && r->rx_hz != 0 && r->rx_hz == aprs_cfg_freq(&aprs_s.cfg) &&
-		    (own || rx_by_stream());
+	// On the APRS frequency with receive on, or on the data link's in KISS data mode (its frames go to the host)
+	bool on_freq = (aprs_s.cfg.rx_on && r->rx_hz == aprs_cfg_freq(&aprs_s.cfg)) ||
+		       (data_mode() && r->rx_hz == aprs_data_freq(&aprs_s.cfg));
+	bool want = r->fm_rx && r->rx_hz != 0 && on_freq && (own || rx_by_stream());
 	// The wait only after a refusal: an old rx_retry_ms compared 24.8 days later would read as in the future
 	if (want && !aprs_s.rx_running && (!aprs_s.rx_retry_wait || (int32_t)(now_ms - aprs_s.rx_retry_ms) >= 0)) {
 		aprs_s.rx_peak = 0;
@@ -957,7 +990,8 @@ bool aprs_rx_listening(void)
 bool aprs_rf_pending(void)
 {
 	LOCK();
-	bool p = aprs_s.qn > 0 && aprs_s.taken == 0 && aprs_s.block == APRS_OK && (int32_t)(aprs_s.now - aprs_s.rf_next_ms) >= 0;
+	bool p = aprs_s.qn > 0 && aprs_s.taken == 0 && queue_block() == APRS_OK &&
+		 (int32_t)(aprs_s.now - aprs_s.rf_next_ms) >= 0;
 	UNLOCK();
 	return p;
 }
@@ -966,10 +1000,13 @@ bool aprs_rf_take(aprs_rf_job_t *job, uint32_t now_ms)
 {
 	LOCK();
 	aprs_s.now = now_ms;
-	if (aprs_s.qn == 0 || aprs_s.block != APRS_OK || aprs_s.taken != 0) {
+	if (aprs_s.qn == 0 || aprs_s.taken != 0 || queue_block() != APRS_OK) {
 		UNLOCK();
 		return false;
 	}
+	// One transmission, one frequency: the frames queued for the first one's (APRS, or the data link's)
+	uint32_t hz = frame_hz(&aprs_s.q[0]);
+	bool data = aprs_s.q[0].kind == K_HOST && data_mode();
 	uint16_t flags = hdlc_flags_for_ms((uint16_t)(aprs_s.cfg.txdelay * 10u), AFSK_BAUD, MIN_FLAGS);
 	hdlc_enc_t e;
 	uint8_t n = 0;
@@ -979,7 +1016,7 @@ bool aprs_rf_take(aprs_rf_job_t *job, uint32_t now_ms)
 		n = 0;
 		// Frames back to back, one flag between them, as many as fit with the tail. A flag leaves the NRZI level as
 		// it found it and resets the stuffing count, so taking the tail's extra flags back off is exact
-		while (ok && n < aprs_s.qn) {
+		while (ok && n < aprs_s.qn && frame_hz(&aprs_s.q[n]) == hz) {
 			hdlc_enc_t keep = e;
 			if (!hdlc_enc_frame(&e, aprs_s.q[n].data, aprs_s.q[n].len) || !hdlc_enc_flags(&e, TAIL_FLAGS)) {
 				e = keep;
@@ -1002,8 +1039,8 @@ bool aprs_rf_take(aprs_rf_job_t *job, uint32_t now_ms)
 	}
 	hdlc_enc_flags(&e, TAIL_FLAGS - 1u);	// room checked above
 	aprs_s.taken = n;
-	job->hz = aprs_cfg_freq(&aprs_s.cfg);
-	job->narrow = aprs_s.cfg.narrow;
+	job->hz = hz;
+	job->narrow = data ? !aprs_s.cfg.data_wide : aprs_s.cfg.narrow;
 	job->level = aprs_s.cfg.level;
 	job->tones = aprs_s.tones;
 	job->nbits = (uint16_t)e.nbits;
@@ -1251,7 +1288,9 @@ bool aprs_host_frame(const uint8_t *frame, size_t n, uint32_t now_ms)
 	// hears the queue's state after each change
 	bool data = aprs_s.cfg.kiss_data;
 	ok = ok && aprs_s.cfg.kiss && aprs_s.me_ok && strcmp(f.src.call, aprs_s.me.call) == 0 &&
-	     (data || aprs_s.host_tokens > 0) && aprs_s.block == APRS_OK && queue_raw(K_HOST, frame, n);
+	     (data || aprs_s.host_tokens > 0) &&
+	     freq_block(data ? aprs_data_freq(&aprs_s.cfg) : aprs_cfg_freq(&aprs_s.cfg)) == APRS_OK &&
+	     queue_raw(K_HOST, frame, n);
 	if (ok) {
 		if (!data) {
 			aprs_s.host_tokens--;

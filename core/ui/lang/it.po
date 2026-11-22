@@ -987,7 +987,7 @@ msgctxt "APRS_VALUE_AS_CHANNEL"
 msgid "As channel"
 msgstr "Come canale"
 
-#: core/ui/ui_aprs.c
+#: core/ui/ui_aprs.c core/ui/ui_menus.c
 msgctxt "APRS_VALUE_KISS_DATA"
 msgid "Data"
 msgstr "Dati"
@@ -1016,6 +1016,61 @@ msgstr "Questa radio non riceve APRS"
 msgctxt "HINT_0_9_PICK_BACK"
 msgid "0-9 pick  Back"
 msgstr "0-9 scegli  Indietro"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_BODY_SET_DATA"
+msgid "Set KISS on USB to Data for RadioLink (ATAK)."
+msgstr "Imposta KISS su USB a Dati per RadioLink (ATAK)."
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_BODY_HOW_TO_SET"
+msgid "Tune the data frequency (FM), then press 2 here."
+msgstr "Sintonizza la frequenza dati (FM), poi premi 2 qui."
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_BODY_LISTENING"
+msgid "Sending and listening here."
+msgstr "Invio e ascolto qui."
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_BODY_SEND_ONLY"
+msgid "Sending. To receive, tune an FM channel or the VFO here."
+msgstr "Invio. Per ricevere, sintonizza qui un canale FM o il VFO."
+
+#: core/ui/ui_aprs.c core/ui/ui_menus.c
+msgctxt "CHAN_LABEL_BANDWIDTH"
+msgid "Bandwidth"
+msgstr "Banda"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_VALUE_AS_APRS"
+msgid "As APRS"
+msgstr "Come APRS"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_TOAST_AS_APRS"
+msgid "Data link: APRS frequency"
+msgstr "Collegamento dati: frequenza APRS"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_TOAST_TUNE_FM"
+msgid "Tune an FM channel or the VFO first"
+msgstr "Sintonizza prima un canale FM o il VFO"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_TOAST_FREQ_SET"
+msgid "Data link: this frequency"
+msgstr "Collegamento dati: questa frequenza"
+
+#: core/ui/ui_aprs.c core/ui/ui_menus.c
+msgctxt "TITLE_DATA_LINK"
+msgid "Data link"
+msgstr "Link dati"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_HINT"
+msgid "1-3 pick  Hold 2: as APRS"
+msgstr "1-3 scegli  Tieni 2: APRS"
 
 #: core/ui/ui_aprs.c
 msgctxt "APRS_TITLE_HEARD"
@@ -2251,11 +2306,6 @@ msgstr "Velocità"
 msgctxt "WORD_RX_ONLY"
 msgid "RX only"
 msgstr "Solo RX"
-
-#: core/ui/ui_menus.c
-msgctxt "CHAN_LABEL_BANDWIDTH"
-msgid "Bandwidth"
-msgstr "Banda"
 
 #: core/ui/ui_menus.c
 msgctxt "CHAN_LABEL_RX_TONE"

@@ -56,6 +56,9 @@
 
 extern const ui_scr_def_t ui_find_screen;
 extern const ui_scr_def_t ui_aprs_screen, ui_aprs_heard_screen, ui_aprs_station_screen;	// ui_aprs.c
+#if CONFIG_APRS_AFSK
+extern const ui_scr_def_t ui_datalink_screen;	// ui_aprs.c
+#endif
 #if CONFIG_POSITION
 extern const ui_scr_def_t ui_fixed_pos_screen;	// ui_position.c
 #endif
@@ -6368,12 +6371,15 @@ void ui_crash_tick(uint32_t now_ms)
 // Every tool keeps its number on every radio and build, so a key path (OK 6 7: Diagnostics; tests/hil/test_ui.py and the
 // user guide) is the same everywhere. The one a radio may not have (Battery) is last, so no radio has a gap; a build
 // without diagnostics skips 7
-enum { T_SCAN, T_POSITION, T_HOTSPOT, T_USB_NET, T_SFR, T_ROAM, T_DIAG, T_APRS, T_BATTERY, T_ZONE_OFFER, T_COUNT };
+enum { T_SCAN, T_POSITION, T_HOTSPOT, T_USB_NET, T_SFR, T_ROAM, T_DIAG, T_APRS, T_BATTERY, T_ZONE_OFFER, T_DATALINK, T_COUNT };
 
 // A tool this build or radio doesn't have is left out of the list (Battery, Supply on a radio that measures its DC
 // input instead, is left out where the radio measures neither)
 static bool tool_shown(uint16_t i)
 {
+	if (i == T_DATALINK)
+		return CONFIG_APRS_AFSK && CONFIG_C4FM;	// the DM32-M6OER build's data link (RadioLink); numbered by row
+
 #if CONFIG_ZONE_SHARE
 	if (i == T_ZONE_OFFER)
 		return offer_waiting();	// 0 on the keypad: only while another radio's zone waits
@@ -6432,7 +6438,7 @@ static void tools_item(uint16_t row, ui_item_t *it)
 		TRN(TITLE_HOTSPOT, "Hotspot"), TRN(TOOLS_ROW_USB_NETWORK, "USB network"),
 		TRN(TOOLS_ROW_SFR, "Single-freq repeater"), TRN(TITLE_ROAMING, "Roaming"),
 		TRN(TITLE_DIAGNOSTICS, "Diagnostics"), TRX(WORD_APRS, "APRS"), TRN(TITLE_BATTERY, "Battery"),
-		TRN(TOOLS_ROW_SHARES_RECEIVED, "Zones/Chs Received") };
+		TRN(TOOLS_ROW_SHARES_RECEIVED, "Zones/Chs Received"), TRN(TITLE_DATA_LINK, "Data link") };
 	uint16_t i = tools_row(row);
 	if (i >= T_COUNT)
 		return;
@@ -6500,6 +6506,14 @@ static void tools_item(uint16_t row, ui_item_t *it)
 		if (!CONFIG_APRS)
 			it->flags |= UI_ITEM_DIM;
 		break;
+#if CONFIG_APRS_AFSK
+	case T_DATALINK: {
+		aprs_cfg_t c;
+		ui_svc_aprs_cfg(&c);
+		sb_str(&b, !c.kiss ? TR(VALUE_OFF, "Off") : c.kiss_data ? TR(APRS_VALUE_KISS_DATA, "Data") : TR(VALUE_ON, "On"));
+		break;
+	}
+#endif
 #if CONFIG_ZONE_SHARE
 	case T_ZONE_OFFER: {
 		ui_zone_offer_t o;
@@ -6536,6 +6550,9 @@ static void tools_select(uint16_t row, bool hold)
 	case T_DIAG: ui_push(SCR_DIAG, 0); break;
 	case T_ROAM: ui_push(SCR_ROAM, 0); break;
 	case T_APRS: ui_push(SCR_APRS, 0); break;
+#if CONFIG_APRS_AFSK
+	case T_DATALINK: ui_push(SCR_DATALINK, 0); break;
+#endif
 	case T_ZONE_OFFER: ui_push(SCR_OFFER, 0); break;
 	default: break;
 	}
@@ -8783,6 +8800,9 @@ const ui_scr_def_t *const ui_scr[SCR_COUNT] = {
 #endif
 #if CONFIG_APRS_AFSK
 	[SCR_APRS_TO] = &aprs_to_screen,
+#if CONFIG_APRS_AFSK
+	[SCR_DATALINK] = &ui_datalink_screen,
+#endif
 #endif
 #if CONFIG_DMR_SMS || CONFIG_APRS_AFSK
 	[SCR_MESSAGE_TEXT] = &message_text_screen,

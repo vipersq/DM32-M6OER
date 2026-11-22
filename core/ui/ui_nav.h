@@ -47,6 +47,7 @@ typedef enum {
 	SCR_C4FM_CALL,			// Menu > C4FM > Callsign: the text entry (CONFIG_C4FM)
 	SCR_WX_ROOMS,			// Menu > C4FM > Wires-X > Rooms: the node's room list (CONFIG_C4FM)
 	SCR_WX_SEARCH,			// Menu > C4FM > Wires-X > Search: the room name entry (CONFIG_C4FM)
+	SCR_DATALINK,			// Tools > Data link: KISS data mode and its own frequency (CONFIG_APRS_AFSK)
 #if CONFIG_BACKLIGHT_TEST
 	SCR_BL_TEST,			// Settings > Advanced > Backlight tests
 #endif

@@ -277,6 +277,7 @@ typedef struct {
 	uint8_t tac_level;		// the tactical tones' volume, 1-10 of the beep level
 	uint8_t tac_count;		// how many times each tactical tone plays, less one, 2 bits each: key, unkey, RX, RX end
 	uint8_t roger_level;		// the roger sound's loudness 1-10 (0: the default, 5)
+	uint32_t data_hz;		// Tools > Data link: KISS data mode's frequency (aprs.md 9); 0: the APRS frequency
 } settings_t;
 
 // Pages: settings_t is stored as records of SETTINGS_PAGE_BYTES each (settings-store.md 2.1). Only the pages its size
@@ -493,6 +494,7 @@ static inline void settings_set_tones_off(settings_t *s, uint8_t off)
 #define SETTINGS_APRS2_TO_IS		0x10u	// our own beacons to APRS-IS through the host helper
 #define SETTINGS_APRS2_DMR_GPS		0x20u	// our position in DMR voice calls (ETSI GPS Info LC, CONFIG_DMR_GPS)
 #define SETTINGS_APRS2_KISS_DATA	0x40u	// KISS data mode: host frames without the APRS burst limit (aprs.md 9)
+#define SETTINGS_APRS2_DATA_WIDE	0x80u	// KISS data mode at 25 kHz (else 12.5 kHz, the 2 m band plan's channel)
 // aprs_misc bit 7: the position service's settings are set (core/position: aprs_lat, aprs_lon, aprs_alt_m,
 // aprs_pos_src, the ambiguity and SETTINGS_APRS2_DMR_GPS). They are also taken when aprs_stored is 1
 #define SETTINGS_APRS_MISC_POSITION	0x80u

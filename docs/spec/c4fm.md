@@ -369,3 +369,12 @@ where it is now (settings.c `fork_record_move`); the stored power levels go back
 - Side keys (Settings > Keys): Tactical, Tactical tones, Roger on/off, APRS position, numbered 200-203 in the
   codeplug's key slots so RadioFoundry's own later numbers never read as them.
 - APRS messaging and SmartBeaconing are RadioFoundry's (Tools > APRS, Calls > Messages, Settings > Location).
+
+## Data link for RadioLink (ATAK)
+
+- Tools > Data link (the last tool): KISS on USB (Off, On, Data; the same setting as Tools > APRS), the data
+  frequency and its bandwidth (12.5 kHz unless set to 25). Press 2 while the radio is on the data frequency (an FM
+  channel or the VFO) to take it; hold 2 to go back to the APRS frequency. The body says whether the radio sends
+  only, or sends and listens (on that frequency in FM). APRS beacons stay on the APRS frequency ([aprs.md 9](aprs.md)).
+- The host's 'Q' query (KISS SetHardware) answers the queue, why the data frequency is blocked, the KISS mode and the
+  callsign, without transmitting; RadioLink's "Check radio" uses it.
