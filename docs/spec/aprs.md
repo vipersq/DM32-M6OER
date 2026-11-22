@@ -364,6 +364,9 @@ at any time with SetHardware 'Q' and no data (in either KISS mode): the radio an
 why RF is blocked (`APRS_OK` 0, no callsign 1, no frequency 2, not an amateur frequency 3, ...), the mode (1 KISS, 2
 data) and its callsign without SSID; nothing goes on air.
 
+**Mode (FM or DMR).** Data link row 4 (`SETTINGS_DATA_DMR` in `settings_t.data_flags`, `aprs_cfg_t.data_dmr`) sends
+the host's frames over DMR instead (9.2). The status answer's mode is then 3.
+
 ### 9.1 iGate
 
 The rules are in firmware (`aprs_igate.c`, after aprs-is.net "IGate Design" and "q Construct"); the APRS-IS TCP
@@ -380,6 +383,31 @@ in the radio's own APRS-IS client (`CONFIG_NET_APRSIS`, `tcp-services.md` 7), wh
 - Digipeater (RX builds, off): fill-in (WIDE1-1 only) or wide (WIDE1-1 and WIDE2-N), also our own call in the path;
   our call inserted before the WIDE entry, marked used (traced), the hop count decremented; duplicates suppressed
   for 30 s.
+
+### 9.2 Data link over DMR
+
+Built with both backends (`CONFIG_DATALINK_DMR` = `CONFIG_APRS_AFSK` and `CONFIG_APRS_DMR`, derived in `config.h`).
+With KISS data mode on and the data link's mode DMR, the host's frames don't go to the FM queue:
+
+| | |
+|---|---|
+| Queue | their own, `APRS_DLINK_QUEUE` (4) frames, each with 8 octets of headroom (`aprs_dlink_*`, `aprs_ax25.c`). The host gets the same SetHardware 'Q' reports as in FM (queued, refused, sent, failed) with this queue's free slots |
+| Sender | `aprs_dlink_dmr.c`, in the radio task with the data service's tick: when the service is free it takes every queued frame, writes a UDP header into each one's headroom and gives them to `dmrDataServiceSendIPChain` |
+| On air | one UDP datagram per AX.25 frame (the frame as the host gave it), from and to port 4200 (`DMR_UDP_PORT_DATA_LINK`), to the channel's talk target (its talkgroup, or a private call), unconfirmed, rate 1/2, the compressed UDP/IPv4 header (SAP 3; 4200 is outside the 4000-4099 range kept in full). Frames waiting go in one transmission as far as it holds them (`DMR_DATA_MAX_BURSTS`), the rest in the next |
+| Result | the transmission's end: sent, or failed (tried again, `RF_TRIES` transmissions in all, then dropped and counted) |
+| Receive | the data service hands a datagram to port 4200 for us or a group we listen to (not our own, not one left to the PC) to `dmrDataServiceDataLinkRx`; the frame goes to the host as a received KISS DATA frame, nothing else (no station list, no digipeating, no iGate) |
+| Blocked | not on a DMR channel we may send on, or no talk target: `APRS_NOT_DMR` (7); no DMR ID: `APRS_NO_DMR_ID` (8). Host frames are refused then, and the status answer says which |
+
+The frequency and bandwidth rows apply to FM only; over DMR the channel decides. Every radio of a group needs the same
+DMR channel (frequency, color code, timeslot) and talkgroup. At rate 1/2 a 300 octet frame takes about 26 blocks,
+1.6 s; a position about 0.5 s. Turning DMR off with frames queued drops them. The data link's frames never go
+through the FM queue and APRS's own frames never through this one.
+
+Host tests: `dmrDataServiceTest` (`testDataLink`: chained frames sent by the service and heard by another radio, the
+longest frame, a private call; another talkgroup, another radio, the ports either side and our own are left alone)
+and `radioCoreTestAprs` (`test_datalink_dmr`: host frames to the air decoded back, the queue reports, several in
+flight, another radio's frame to the host, the status answer's mode and block, off a DMR channel). UI:
+`c4fmUiSmoke.sh` opens the screen in both modes. Not tested on air yet.
 
 ## 10. UI
 

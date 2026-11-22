@@ -11,6 +11,9 @@
 #include "codeplug/codeplug_modes.h"
 #if CONFIG_APRS
 #include "aprs/aprs_beacon.h"	// APRS_WHY_*
+#if CONFIG_DATALINK_DMR
+#include "aprs/kiss.h"		// the data link test reads the host's stream
+#endif
 #endif
 #include "radio/radio_sfr.h"
 #include "radio/radio_bands.h"
@@ -3303,6 +3306,183 @@ static void test_aprs_dmr_beacon(void)
 }
 #endif
 
+#if CONFIG_DATALINK_DMR
+// A RadioLink-style frame from the host: TAKRF from Q0TST-7 via NOGATE, info "{T" and n octets
+static size_t dlink_frame(uint8_t *out, size_t max, size_t n, uint8_t seed)
+{
+	static uint8_t info[AX25_INFO_MAX];
+	ax25_frame_t f;
+	memset(&f, 0, sizeof(f));
+	CHECK(ax25_addr_parse("TAKRF", 5, &f.dst) && ax25_addr_parse("Q0TST-7", 7, &f.src) &&
+	      ax25_addr_parse("NOGATE", 6, &f.digi[0]));
+	f.dst.h = true;
+	f.ndigi = 1;
+	f.control = AX25_CONTROL_UI;
+	f.pid = AX25_PID_NONE;
+	info[0] = '{';
+	info[1] = 'T';
+	for (size_t i = 2; i < n; i++) {
+		info[i] = (uint8_t)(seed + i);
+	}
+	f.info = info;
+	f.info_len = (uint16_t)n;
+	return ax25_encode(&f, out, max);
+}
+
+// The host's view: everything the TNC sent since the last call, KISS encoded
+static size_t dlink_host(uint8_t *out, size_t max)
+{
+	size_t n = 0, k;
+	while (n < max && (k = aprs_host_output(out + n, max - n)) != 0) {
+		n += k;
+	}
+	return n;
+}
+
+// The last SetHardware 'Q' in a host stream: its free slots and event (-1: none)
+static int dlink_q(const uint8_t *o, size_t n, uint8_t *free_slots, uint8_t *extra)
+{
+	int ev = -1;
+	for (size_t i = 0; i + 4 < n; i++) {
+		if (o[i] == KISS_FEND && o[i + 1] == KISS_CMD_SETHW && o[i + 2] == KISS_TAG_QUEUE) {
+			*free_slots = o[i + 3];
+			ev = o[i + 4];
+			if (extra != NULL && ev == KISS_Q_STATUS && i + 6 < n) {
+				extra[0] = o[i + 5];	// why RF is blocked
+				extra[1] = o[i + 6];	// the mode
+			}
+		}
+	}
+	return ev;
+}
+
+// The UDP datagrams to the data link's port among the bursts on air from first on, decoded as a receiver would
+static int dlink_air(unsigned first, uint8_t *payload, int *length)
+{
+	int found = 0;
+	dmrDataRxReset();
+	for (unsigned i = first; i < sim.air_count; i++) {
+		dmrBurst_t b;
+		memset(&b, 0, sizeof(b));
+		b.dataType = sim.air[i].kind;
+		b.length = sim.air[i].len;
+		memcpy(b.payload, sim.air[i].payload, sizeof(b.payload) < sizeof(sim.air[i].payload) ?
+		       sizeof(b.payload) : sizeof(sim.air[i].payload));
+		if (dmrDataRxBurst(&b) == DMR_DATA_RX_PACKET) {
+			dmrDataUDP_t u;
+			if (dmrDataGetUDP(&dmrDataRxPacket, &u) && u.dstPort == DMR_UDP_PORT_DATA_LINK &&
+			    u.srcPort == DMR_UDP_PORT_DATA_LINK && dmrDataRxPacket.group && dmrDataRxPacket.dst == 201) {
+				memcpy(payload, u.payload, (size_t)u.length);
+				*length = u.length;
+				found++;
+			}
+		}
+	}
+	dmrDataRxReset();
+	return found;
+}
+
+// The data link over DMR (docs/spec/aprs.md 9.2): KISS data mode's host frames go out as DMR data on the channel's
+// talkgroup, with the same queue reports as FM; frames from other radios' data links come back to the host; off a
+// DMR channel nothing is taken and the status answer says why
+static void test_datalink_dmr(void)
+{
+	static uint8_t out[2048], fr[AX25_FRAME_MAX], got[AX25_FRAME_MAX + 8];
+	aprs_cfg_t c;
+	aprs_view_t v;
+	uint8_t slots = 0, why[2] = { 0, 0 };
+	int len = 0;
+
+	boot();
+	dmr_start(true);
+	aprs_set_test_call("Q0TST");
+	aprs_get_cfg(&c);
+	c.kiss = c.kiss_data = c.data_dmr = true;
+	aprs_set_cfg(&c, now);
+	run(100);
+	dlink_host(out, sizeof out);
+	aprs_get_view(&v);
+	CHECK(v.data_block == APRS_OK && v.data_tg == 201 && !v.data_private);
+
+	// The host asks: mode 3 (data over DMR), nothing blocks
+	aprs_host_status_query();
+	size_t n = dlink_host(out, sizeof out);
+	CHECK(dlink_q(out, n, &slots, why) == KISS_Q_STATUS && slots == APRS_DLINK_QUEUE && why[0] == APRS_OK && why[1] == 3);
+
+	// One frame, the longest RadioLink sends (256 octets of info): queued, then on air as DMR data, then "sent"
+	size_t fn = dlink_frame(fr, sizeof fr, AX25_INFO_MAX, 3);
+	CHECK(fn > AX25_INFO_MAX);
+	unsigned first = sim.air_count;
+	uint32_t rf0 = v.rf_sent;
+	CHECK(aprs_host_frame(fr, fn, now));
+	n = dlink_host(out, sizeof out);
+	CHECK(dlink_q(out, n, &slots, NULL) == KISS_Q_QUEUED && slots == APRS_DLINK_QUEUE - 1);
+	run(6000);
+	CHECK(dlink_air(first, got, &len) == 1 && len == (int)fn && memcmp(got, fr, fn) == 0);
+	aprs_get_view(&v);
+	CHECK(v.data_sent == 1 && v.data_failed == 0 && v.rf_sent == rf0);	// nothing in FM
+	n = dlink_host(out, sizeof out);
+	CHECK(dlink_q(out, n, &slots, NULL) == KISS_Q_SENT && slots == APRS_DLINK_QUEUE);
+
+	// Several queued at once: all of them go, in as few transmissions as fit
+	first = sim.air_count;
+	for (uint8_t i = 0; i < 3; i++) {
+		fn = dlink_frame(fr, sizeof fr, 40, (uint8_t)(10 * i));
+		CHECK(aprs_host_frame(fr, fn, now));
+	}
+	run(8000);
+	aprs_get_view(&v);
+	CHECK(v.data_sent == 4 && v.data_failed == 0);
+	CHECK(dlink_air(first, got, &len) == 3 && len == (int)fn && memcmp(got, fr, fn) == 0);	// the last one last
+	dlink_host(out, sizeof out);
+
+	// Another radio's frame on the talkgroup: to the host as a received KISS frame
+	fn = dlink_frame(fr, sizeof fr, 60, 77);
+	uint8_t data[9 + AX25_FRAME_MAX] = { 0x00, 0x02, 0x00, 0x00, 0x00, 0x10, 0x68, 0x10, 0x68 };
+	memcpy(&data[9], fr, fn);
+	static dmrBurst_t b[DMR_DATA_MAX_BURSTS];
+	int nb = dmrDataBuildPacket(DMR_DPF_UNCONFIRMED, DMR_SAP_UDPIP_COMPRESSION, true, 201, 9991234, data,
+				    (int)(9 + fn), DMR_TYPE_RATE_1_2, 2, b, DMR_DATA_MAX_BURSTS);
+	CHECK(nb > 0);
+	for (int i = 0; i < nb; i++) {
+		now += 60;
+		dmrDataServiceRxBurst(&b[i], now);
+	}
+	run(20);
+	n = dlink_host(out, sizeof out);
+	uint8_t want[2 * AX25_FRAME_MAX + 4];
+	size_t wn = kiss_encode(KISS_CMD_DATA, fr, fn, want, sizeof want);
+	bool seen = false;
+	for (size_t i = 0; wn != 0 && i + wn <= n; i++) {
+		seen = seen || memcmp(&out[i], want, wn) == 0;
+	}
+	CHECK(seen);
+
+	// Off DMR (an FM channel): refused, and the answer says why
+	req(RREQ_ZONE_POS, 0);
+	run(200);
+	aprs_get_view(&v);
+	CHECK(v.data_block == APRS_NOT_DMR);
+	fn = dlink_frame(fr, sizeof fr, 40, 1);
+	CHECK(!aprs_host_frame(fr, fn, now));
+	aprs_host_status_query();
+	n = dlink_host(out, sizeof out);
+	CHECK(dlink_q(out, n, &slots, why) == KISS_Q_STATUS && why[0] == APRS_NOT_DMR && why[1] == 3);
+
+	// Back to FM data mode: the FM queue again, mode 2
+	c.data_dmr = false;
+	aprs_set_cfg(&c, now);
+	run(50);
+	aprs_host_status_query();
+	n = dlink_host(out, sizeof out);
+	CHECK(dlink_q(out, n, &slots, why) == KISS_Q_STATUS && why[1] == 2);
+	c.kiss = c.kiss_data = false;
+	aprs_set_cfg(&c, now);
+	aprs_set_test_call("");
+	run(50);
+}
+#endif
+
 #if CONFIG_APRS_RX
 // One NMEA sentence from src to dst (a private call) on UDP 10110 (SAP 3), as the data service hears it
 static void hear_dmr_nmea(uint32_t src, uint32_t dst, const char *sentence, size_t length)
@@ -5863,7 +6043,7 @@ static void test_factory_reset(void)
 	CHECK(settings_flush());
 	n_ev = 0;
 	CHECK(ui_svc_factory_reset());
-	sim_flash_cut_after(488);	// the settings records (page 1: 212 + 4 bytes, page 0: 252 + 4, rounded up as the sizes are) go in, the native erase fails
+	sim_flash_cut_after(492);	// the settings records (page 1: 216 + 4 bytes, page 0: 252 + 4, rounded up as the sizes are) go in, the native erase fails
 	storage_job_poll();
 	sim_flash_power_on();
 	CHECK(n_ev == 1 && strstr(tr_en(last_ev.why), "native") != NULL);
@@ -10757,6 +10937,9 @@ int main(void)
 	test_dmr_emergency();
 #if CONFIG_APRS_DMR
 	test_aprs_dmr_beacon();
+#if CONFIG_DATALINK_DMR
+	test_datalink_dmr();
+#endif
 #endif
 #if CONFIG_APRS_RX
 	test_dmr_aprs_position();

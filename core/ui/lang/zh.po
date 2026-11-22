@@ -1025,6 +1025,21 @@ msgid "Set KISS on USB to Data for RadioLink (ATAK)."
 msgstr "USB KISS 设为数据，用于 RadioLink (ATAK)。"
 
 #: core/ui/ui_aprs.c
+msgctxt "DATALINK_BODY_DMR_NO_ID"
+msgid "DMR: set your DMR ID."
+msgstr "DMR：请设置 DMR ID。"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_BODY_DMR_TUNE"
+msgid "DMR: tune a DMR channel with a talkgroup."
+msgstr "DMR：请调到有通话组的 DMR 信道。"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_BODY_DMR_HERE"
+msgid "Sending and listening on this channel."
+msgstr "在此信道发送和接收。"
+
+#: core/ui/ui_aprs.c
 msgctxt "DATALINK_BODY_HOW_TO_SET"
 msgid "Tune the data frequency (FM), then press 2 here."
 msgstr "调到数据频率 (FM)，然后在此按 2。"
@@ -1043,6 +1058,11 @@ msgstr "发送中。接收时请把 FM 信道或 VFO 调到此频率。"
 msgctxt "CHAN_LABEL_BANDWIDTH"
 msgid "Bandwidth"
 msgstr "带宽"
+
+#: core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_screens.c
+msgctxt "LABEL_MODE"
+msgid "Mode"
+msgstr "模式"
 
 #: core/ui/ui_aprs.c
 msgctxt "DATALINK_VALUE_AS_APRS"
@@ -1068,6 +1088,11 @@ msgstr "数据连接：此频率"
 msgctxt "TITLE_DATA_LINK"
 msgid "Data link"
 msgstr "数据连接"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_HINT_DMR"
+msgid "1-4 pick  Hold 2: as APRS"
+msgstr "1-4 选择  长按 2：APRS"
 
 #: core/ui/ui_aprs.c
 msgctxt "DATALINK_HINT"
@@ -2293,11 +2318,6 @@ msgstr "电台的"
 msgctxt "CHAN_LABEL_NUMBER"
 msgid "Number"
 msgstr "编号"
-
-#: core/ui/ui_menus.c core/ui/ui_screens.c
-msgctxt "LABEL_MODE"
-msgid "Mode"
-msgstr "模式"
 
 #: core/ui/ui_menus.c
 msgctxt "CHAN_LABEL_RATE"

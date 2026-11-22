@@ -91,6 +91,8 @@ typedef struct
 #define DMR_UDP_PORT_ARS			4005
 #define DMR_UDP_PORT_TMS			4007
 #define DMR_UDP_PORT_ETSI_TEXT		5016		// ETSI IP text (TS 102 361-3 5.7.1; compressed port ID 1)
+#define DMR_UDP_PORT_DATA_LINK		4200		// a KISS TNC's frames between radios (the data link, docs/spec/aprs.md 9.2;
+													// above 4000-4099: compressed headers on auto)
 #define DMR_UDP_PORT_NMEA			10110		// NMEA over UDP: the DMR APRS position some radios send (docs/spec/dmr-data.md 3)
 
 // The privacy header: a proprietary second header (TS 102 361-1 8.2.1.4, DPF 15) with the Motorola MFID after the

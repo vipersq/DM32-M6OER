@@ -89,6 +89,7 @@ static void cw_cancel(radio_sm_t *sm);
 #include "radio/radio_bands.h"	// the listen bands, never DMR
 #if CONFIG_APRS_AFSK
 #include "aprs/afsk.h"			// AFSK_BAUD, the tones
+#include "aprs/aprs_dlink_dmr.h"		// the data link over DMR (aprs.md 9.2)
 #endif
 #if CONFIG_POSITION
 #include "position/position.h"		// our position for DMR GPS Info and LRRP (docs/spec/position.md)
@@ -3311,6 +3312,18 @@ static void data_tick(radio_sm_t *sm, uint32_t now_ms)
 #endif
 #if CONFIG_DMR_AIR_QUEUE
 	airqTick(sm->view.dmr.own_id, now_ms);	// the next queued packet, when the service is free
+#endif
+#if CONFIG_DATALINK_DMR
+	// KISS data mode's frames over DMR (docs/spec/aprs.md 9.2): on this channel's talk target. A DMR channel without
+	// an ID still counts as one, so the screen can say what is missing
+	bool on_dmr = sm->view.ch.mode == RADIO_MODE_DMR;
+	aprs_dlink_dmr_channel_t dl = {
+		.dmr = on_dmr && (sm->view.dmr.own_id == 0 || c.canTransmit),
+		.own_id = sm->view.dmr.own_id,
+		.talk = sm->talk_id,
+		.private_call = sm->talk_private,
+	};
+	aprs_dlink_dmr_tick(&dl, now_ms);
 #endif
 #if CONFIG_ZONE_SHARE
 	zone_share_tick(now_ms);

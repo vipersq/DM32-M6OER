@@ -1023,6 +1023,21 @@ msgid "Set KISS on USB to Data for RadioLink (ATAK)."
 msgstr "Mettez KISS sur USB sur Données pour RadioLink (ATAK)."
 
 #: core/ui/ui_aprs.c
+msgctxt "DATALINK_BODY_DMR_NO_ID"
+msgid "DMR: set your DMR ID."
+msgstr "DMR : réglez votre ID DMR."
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_BODY_DMR_TUNE"
+msgid "DMR: tune a DMR channel with a talkgroup."
+msgstr "DMR : choisissez un canal DMR avec un groupe."
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_BODY_DMR_HERE"
+msgid "Sending and listening on this channel."
+msgstr "Émission et écoute sur ce canal."
+
+#: core/ui/ui_aprs.c
 msgctxt "DATALINK_BODY_HOW_TO_SET"
 msgid "Tune the data frequency (FM), then press 2 here."
 msgstr "Réglez la fréquence de données (FM), puis appuyez sur 2 ici."
@@ -1041,6 +1056,11 @@ msgstr "Émission. Pour recevoir, réglez ici un canal FM ou le VFO."
 msgctxt "CHAN_LABEL_BANDWIDTH"
 msgid "Bandwidth"
 msgstr "Bande passante"
+
+#: core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_screens.c
+msgctxt "LABEL_MODE"
+msgid "Mode"
+msgstr "Mode"
 
 #: core/ui/ui_aprs.c
 msgctxt "DATALINK_VALUE_AS_APRS"
@@ -1066,6 +1086,11 @@ msgstr "Liaison de données : cette fréquence"
 msgctxt "TITLE_DATA_LINK"
 msgid "Data link"
 msgstr "Liaison données"
+
+#: core/ui/ui_aprs.c
+msgctxt "DATALINK_HINT_DMR"
+msgid "1-4 pick  Hold 2: as APRS"
+msgstr "1-4 choisir  Maint. 2 : APRS"
 
 #: core/ui/ui_aprs.c
 msgctxt "DATALINK_HINT"
@@ -2291,11 +2316,6 @@ msgstr "De la radio"
 msgctxt "CHAN_LABEL_NUMBER"
 msgid "Number"
 msgstr "Numéro"
-
-#: core/ui/ui_menus.c core/ui/ui_screens.c
-msgctxt "LABEL_MODE"
-msgid "Mode"
-msgstr "Mode"
 
 #: core/ui/ui_menus.c
 msgctxt "CHAN_LABEL_RATE"

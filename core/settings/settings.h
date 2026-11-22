@@ -278,6 +278,8 @@ typedef struct {
 	uint8_t tac_count;		// how many times each tactical tone plays, less one, 2 bits each: key, unkey, RX, RX end
 	uint8_t roger_level;		// the roger sound's loudness 1-10 (0: the default, 5)
 	uint32_t data_hz;		// Tools > Data link: KISS data mode's frequency (aprs.md 9); 0: the APRS frequency
+	uint8_t data_flags;		// SETTINGS_DATA_* (Tools > Data link; 0: the frames go out in FM)
+	uint8_t reserved12[3];		// 0
 } settings_t;
 
 // Pages: settings_t is stored as records of SETTINGS_PAGE_BYTES each (settings-store.md 2.1). Only the pages its size
@@ -293,6 +295,8 @@ typedef struct {
 #define SETTINGS_CP_RX_EXT		0x02u	// receive past the band table is on (not about the codeplug: the free bit here)
 #define SETTINGS_T3_STUN		0x80u	// t3_stun: a stun is kept (bits 0-6 say on which system)
 #define SETTINGS_T3_KILLED		0x01u	// t3_kill: killed
+// data_flags
+#define SETTINGS_DATA_DMR		0x01u	// KISS data mode's frames as DMR data on the DMR channel (aprs.md 9.2)
 // c4fm_flags
 #define SETTINGS_C4FM_PLAIN		0x01u	// plain fields (destination ALL, CM 0) instead of an FT-70D's
 // bits 1-6: unused (test builds kept receiver choices there; ignored, cleared on the next write of the field)

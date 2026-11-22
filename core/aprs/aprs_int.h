@@ -31,6 +31,13 @@ typedef struct {
 	uint8_t data[AX25_FRAME_MAX];
 } qframe_t;
 #endif
+#if CONFIG_DATALINK_DMR
+typedef struct {
+	uint16_t len;		// the frame's octets
+	uint8_t tries;
+	uint8_t buf[APRS_DLINK_HEADROOM + AX25_FRAME_MAX];
+} dframe_t;
+#endif
 
 typedef struct {
 	aprs_cfg_t cfg;
@@ -50,6 +57,15 @@ typedef struct {
 	qframe_t q[QUEUE_LEN];
 	uint8_t qn;
 	uint8_t taken;		// frames in the transmission under way
+#if CONFIG_DATALINK_DMR
+	// The data link over DMR: its own queue (the DMR side takes the frames in the radio task) and the channel's state
+	dframe_t dq[APRS_DLINK_QUEUE];
+	uint8_t dqn;
+	uint8_t dtaken;		// frames in the DMR transmission under way
+	uint8_t dblock;		// aprs_block_t on the DMR channel (aprs_dlink_channel)
+	uint32_t dtalk;		// the channel's talk target, 0 none
+	bool dpriv;		// ... a private call
+#endif
 	uint32_t rf_next_ms;	// no transmission before
 	uint8_t tones[TONES_BYTES];
 	struct {

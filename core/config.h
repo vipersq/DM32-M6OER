@@ -309,6 +309,11 @@
 #ifndef CONFIG_APRS_DMR
 #define CONFIG_APRS_DMR			(CONFIG_APRS && CONFIG_DMR)
 #endif
+// The data link over DMR (aprs.md 9.2): KISS data mode's frames as DMR data. Derived: both APRS backends, the TNC of the
+// one and the DMR data core of the other
+#ifndef CONFIG_DATALINK_DMR
+#define CONFIG_DATALINK_DMR		(CONFIG_APRS_AFSK && CONFIG_APRS_DMR)
+#endif
 // C4FM DN voice (the GPL fork's core/c4fm, docs/spec/c4fm.md): a radio mode beside FM, sharing DMR's codec glue
 #ifndef CONFIG_C4FM
 #define CONFIG_C4FM			0

@@ -40,8 +40,10 @@ check "ok 7 6 down ok" c4fm-call
 check "ok 7 7 down down down down down ok" group
 check "ok 1" zones
 check "ok 6" tools
-# Tools > Data link (the last tool): KISS mode, its frequency, bandwidth
+# Tools > Data link (the last tool): KISS mode, its frequency, bandwidth, FM or DMR (Data, then over DMR: its body)
 check "ok 6 up ok" datalink
 check "ok 6 up ok 1 1 3" datalink
+check "ok 6 up ok 1 1 4" datalink
+check "ok 6 up ok 1 1 4 4" datalink
 check "ok ok" home
 [ $fail = 0 ] && echo "c4fmUiSmoke: passed" || { echo "c4fmUiSmoke: FAILED"; exit 1; }

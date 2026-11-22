@@ -325,7 +325,7 @@ const ui_scr_def_t ui_aprs_screen = {
 // back to APRS's) and its bandwidth. The body says whether the radio listens there: only on an FM channel tuned to it
 
 #if CONFIG_APRS_AFSK
-enum { DL_KISS, DL_FREQ, DL_WIDTH, DL_COUNT };
+enum { DL_KISS, DL_FREQ, DL_WIDTH, DL_MODE, DL_COUNT };	// DL_MODE: FM or DMR (CONFIG_DATALINK_DMR)
 
 static const char *datalink_body(void)
 {
@@ -342,6 +342,22 @@ static const char *datalink_body(void)
 		sb_str(&b, TR(DATALINK_BODY_SET_DATA, "Set KISS on USB to Data for RadioLink (ATAK)."));
 		return t;
 	}
+#if CONFIG_DATALINK_DMR
+	if (c.data_dmr) {
+		// Over DMR: the channel's talk target, whatever its frequency (aprs.md 9.2)
+		if (v.data_block == APRS_NO_DMR_ID) {
+			sb_str(&b, TR(DATALINK_BODY_DMR_NO_ID, "DMR: set your DMR ID."));
+		} else if (v.data_block != APRS_OK || v.data_tg == 0) {
+			sb_str(&b, TR(DATALINK_BODY_DMR_TUNE, "DMR: tune a DMR channel with a talkgroup."));
+		} else {
+			sb_str(&b, v.data_private ? "DMR ID " : "DMR TG ");
+			sb_u32(&b, v.data_tg, 1);
+			sb_str(&b, "  ");
+			sb_str(&b, TR(DATALINK_BODY_DMR_HERE, "Sending and listening on this channel."));
+		}
+		return t;
+	}
+#endif
 	if (c.data_hz == 0) {
 		// No frequency of its own yet: how to set one (APRS's is the network's, not for a data link)
 		sb_str(&b, TR(DATALINK_BODY_HOW_TO_SET, "Tune the data frequency (FM), then press 2 here."));
@@ -360,12 +376,12 @@ static const char *datalink_body(void)
 	return t;
 }
 
-static uint16_t datalink_count(void) { return DL_COUNT; }
+static uint16_t datalink_count(void) { return CONFIG_DATALINK_DMR ? DL_COUNT : DL_MODE; }
 
 static void datalink_item(uint16_t i, ui_item_t *it)
 {
 	static const tr_id_t names[] = { TRN(APRS_LABEL_KISS_ON_USB, "KISS on USB"),
-		TRN(APRS_LABEL_FREQUENCY, "Frequency"), TRN(CHAN_LABEL_BANDWIDTH, "Bandwidth") };
+		TRN(APRS_LABEL_FREQUENCY, "Frequency"), TRN(CHAN_LABEL_BANDWIDTH, "Bandwidth"), TRN(LABEL_MODE, "Mode") };
 	if (i >= DL_COUNT) {
 		return;
 	}
@@ -387,6 +403,7 @@ static void datalink_item(uint16_t i, ui_item_t *it)
 		}
 		break;
 	case DL_WIDTH: sb_str(&b, c.data_wide ? "25 kHz" : "12.5 kHz"); break;
+	case DL_MODE: sb_str(&b, c.data_dmr ? "DMR" : "FM"); break;
 	default: break;
 	}
 }
@@ -427,6 +444,12 @@ static void datalink_select(uint16_t i, bool hold)
 		break;
 	}
 	case DL_WIDTH: c.data_wide = !c.data_wide; break;
+	case DL_MODE:
+		if (!CONFIG_DATALINK_DMR) {
+			return;
+		}
+		c.data_dmr = !c.data_dmr;
+		break;
 	default: return;
 	}
 	ui_svc_aprs_set_cfg(&c);
@@ -435,7 +458,11 @@ static void datalink_select(uint16_t i, bool hold)
 
 const ui_scr_def_t ui_datalink_screen = {
 	.name = "datalink", .flags = SF_LIST | SF_NUMBERED | SF_FIELD, .prefix = TRN(TITLE_DATA_LINK, "Data link"),
+#if CONFIG_DATALINK_DMR
+	.hint = TRN(DATALINK_HINT_DMR, "1-4 pick  Hold 2: as APRS"),
+#else
 	.hint = TRN(DATALINK_HINT, "1-3 pick  Hold 2: as APRS"),
+#endif
 	.count = datalink_count, .item = datalink_item, .select = datalink_select, .body = datalink_body,
 };
 #endif

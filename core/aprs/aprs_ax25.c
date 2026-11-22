@@ -301,6 +301,38 @@ static bool data_mode(void)
 	return aprs_s.cfg.kiss && aprs_s.cfg.kiss_data;
 }
 
+// KISS data mode over DMR (aprs.md 9.2): the host's frames wait in the data link's queue for the DMR side
+static bool dlink_on(void)
+{
+#if CONFIG_DATALINK_DMR
+	return data_mode() && aprs_s.cfg.data_dmr;
+#else
+	return false;
+#endif
+}
+
+// What blocks the host's frames: the DMR channel's state over DMR, else the data frequency's
+static uint8_t data_block(void)
+{
+#if CONFIG_DATALINK_DMR
+	if (dlink_on()) {
+		return aprs_s.dblock;
+	}
+#endif
+	return freq_block(aprs_data_freq(&aprs_s.cfg));
+}
+
+// Free slots for the host's frames, in the queue they go to
+static uint8_t host_free(void)
+{
+#if CONFIG_DATALINK_DMR
+	if (dlink_on()) {
+		return (uint8_t)(APRS_DLINK_QUEUE - aprs_s.dqn);
+	}
+#endif
+	return (uint8_t)(QUEUE_LEN - aprs_s.qn);
+}
+
 static uint32_t frame_hz(const qframe_t *q)
 {
 	return q->kind == K_HOST && data_mode() ? aprs_data_freq(&aprs_s.cfg) : aprs_cfg_freq(&aprs_s.cfg);
@@ -374,6 +406,29 @@ static void queue_drop(uint8_t count)
 	aprs_s.qn = (uint8_t)(aprs_s.qn - count);
 }
 
+#if CONFIG_DATALINK_DMR
+// A host frame into the data link's queue, after the transport's headroom (lock held)
+static bool dlink_queue(const uint8_t *frame, size_t n)
+{
+	if (aprs_s.dqn >= APRS_DLINK_QUEUE || n > AX25_FRAME_MAX) {
+		return false;
+	}
+	dframe_t *d = &aprs_s.dq[aprs_s.dqn++];
+	memcpy(d->buf + APRS_DLINK_HEADROOM, frame, n);
+	d->len = (uint16_t)n;
+	d->tries = 0;
+	aprs_changed();
+	return true;
+}
+#else
+static bool dlink_queue(const uint8_t *frame, size_t n)
+{
+	(void)frame;
+	(void)n;
+	return false;
+}
+#endif
+
 // --- Host output (lock held) ---
 
 static bool ring_put(uint8_t b)
@@ -424,7 +479,7 @@ static void host_queue_status(uint8_t event)
 	if (!aprs_s.cfg.kiss || !aprs_s.cfg.kiss_data) {
 		return;
 	}
-	uint8_t buf[3] = { KISS_TAG_QUEUE, (uint8_t)(QUEUE_LEN - aprs_s.qn), event };
+	uint8_t buf[3] = { KISS_TAG_QUEUE, host_free(), event };
 	host_emit(KISS_CMD_SETHW, buf, sizeof buf);
 }
 
@@ -434,10 +489,10 @@ void aprs_host_status_query(void)
 	uint8_t buf[5 + AX25_CALL_LEN];
 	size_t n = 0;
 	buf[n++] = KISS_TAG_QUEUE;
-	buf[n++] = (uint8_t)(QUEUE_LEN - aprs_s.qn);
+	buf[n++] = host_free();
 	buf[n++] = KISS_Q_STATUS;
-	buf[n++] = data_mode() ? freq_block(aprs_data_freq(&aprs_s.cfg)) : aprs_s.block;
-	buf[n++] = aprs_s.cfg.kiss_data ? 2u : 1u;
+	buf[n++] = data_mode() ? data_block() : aprs_s.block;
+	buf[n++] = dlink_on() ? 3u : aprs_s.cfg.kiss_data ? 2u : 1u;
 	for (size_t i = 0; i < AX25_CALL_LEN && aprs_s.me.call[i] != '\0'; i++) {
 		buf[n++] = (uint8_t)aprs_s.me.call[i];
 	}
@@ -549,6 +604,9 @@ void aprs_ax25_init(uint32_t now_ms)
 	aprs_s.host_tokens = HOST_BURST;
 	aprs_s.host_refill_ms = now_ms;
 	aprs_s.msg_seq = (uint16_t)(now_ms % 900u);
+#if CONFIG_DATALINK_DMR
+	aprs_s.dblock = APRS_NOT_DMR;	// until the DMR side says what the channel allows
+#endif
 }
 
 void aprs_ax25_poll(uint32_t now_ms)
@@ -579,8 +637,16 @@ void aprs_ax25_tick(uint32_t now_ms)
 		aprs_changed();
 	}
 #endif
+#if CONFIG_DATALINK_DMR
+	// Turned off with frames still waiting for DMR: nowhere for them to go
+	if (!dlink_on() && aprs_s.dqn != 0 && aprs_s.dtaken == 0) {
+		aprs_s.v.data_failed += aprs_s.dqn;
+		aprs_s.dqn = 0;
+		aprs_changed();
+	}
+#endif
 	uint8_t block = rf_block();
-	uint8_t dblock = freq_block(aprs_data_freq(&aprs_s.cfg));
+	uint8_t dblock = data_block();
 	if (block != aprs_s.block || dblock != aprs_s.v.data_block) {
 		aprs_s.block = block;
 		aprs_s.v.data_block = dblock;
@@ -593,7 +659,11 @@ void aprs_ax25_service(void)
 	// This half's view fields first: the returns below leave them set
 	aprs_s.v.freq_hz = aprs_cfg_freq(&aprs_s.cfg);
 	aprs_s.v.data_hz = aprs_data_freq(&aprs_s.cfg);
-	aprs_s.v.data_block = freq_block(aprs_s.v.data_hz);
+	aprs_s.v.data_block = data_block();
+#if CONFIG_DATALINK_DMR
+	aprs_s.v.data_tg = dlink_on() ? aprs_s.dtalk : 0;
+	aprs_s.v.data_private = aprs_s.dpriv;
+#endif
 	aprs_s.v.block = aprs_s.block;
 	aprs_s.v.msg_pending = aprs_s.out.active;
 	aprs_s.v.msg_tries = aprs_s.out.tries;
@@ -918,7 +988,7 @@ void aprs_ax25_rx_service(const aprs_radio_t *r, uint32_t now_ms)
 	bool own = rx_by_board();
 	// On the APRS frequency with receive on, or on the data link's in KISS data mode (its frames go to the host)
 	bool on_freq = (aprs_s.cfg.rx_on && r->rx_hz == aprs_cfg_freq(&aprs_s.cfg)) ||
-		       (data_mode() && r->rx_hz == aprs_data_freq(&aprs_s.cfg));
+		       (data_mode() && !dlink_on() && r->rx_hz == aprs_data_freq(&aprs_s.cfg));
 	bool want = r->fm_rx && r->rx_hz != 0 && on_freq && (own || rx_by_stream());
 	// The wait only after a refusal: an old rx_retry_ms compared 24.8 days later would read as in the future
 	if (want && !aprs_s.rx_running && (!aprs_s.rx_retry_wait || (int32_t)(now_ms - aprs_s.rx_retry_ms) >= 0)) {
@@ -1289,8 +1359,8 @@ bool aprs_host_frame(const uint8_t *frame, size_t n, uint32_t now_ms)
 	bool data = aprs_s.cfg.kiss_data;
 	ok = ok && aprs_s.cfg.kiss && aprs_s.me_ok && strcmp(f.src.call, aprs_s.me.call) == 0 &&
 	     (data || aprs_s.host_tokens > 0) &&
-	     freq_block(data ? aprs_data_freq(&aprs_s.cfg) : aprs_cfg_freq(&aprs_s.cfg)) == APRS_OK &&
-	     queue_raw(K_HOST, frame, n);
+	     (data ? data_block() : freq_block(aprs_cfg_freq(&aprs_s.cfg))) == APRS_OK &&
+	     (dlink_on() ? dlink_queue(frame, n) : queue_raw(K_HOST, frame, n));
 	if (ok) {
 		if (!data) {
 			aprs_s.host_tokens--;
@@ -1338,4 +1408,98 @@ size_t aprs_host_output(uint8_t *out, size_t max)
 	UNLOCK();
 	return n;
 }
+
+#if CONFIG_DATALINK_DMR
+// --- The data link over DMR (aprs.md 9.2): the queue's side; the DMR side is aprs_dlink_dmr.c ---
+
+bool aprs_dlink_on(void)
+{
+	LOCK();
+	bool on = dlink_on();
+	UNLOCK();
+	return on;
+}
+
+int aprs_dlink_take(aprs_dlink_frame_t *out, int max)
+{
+	LOCK();
+	int n = 0;
+	if (aprs_s.dtaken == 0 && dlink_on()) {
+		while (n < max && n < (int)aprs_s.dqn) {
+			out[n].buf = aprs_s.dq[n].buf;
+			out[n].len = aprs_s.dq[n].len;
+			n++;
+		}
+		aprs_s.dtaken = (uint8_t)n;
+	}
+	UNLOCK();
+	return n;
+}
+
+void aprs_dlink_done(int count, bool sent)
+{
+	LOCK();
+	uint8_t taken = aprs_s.dtaken;
+	if (count <= 0) {	// none went (the DMR side couldn't start): back in the queue as they were
+		aprs_s.dtaken = 0;
+		UNLOCK();
+		return;
+	}
+	if (count > (int)taken) {
+		count = taken;
+	}
+	if (sent) {
+		aprs_s.v.data_sent += (uint32_t)count;
+	}
+	// The frames that went: dropped. Failed: tried again RF_TRIES times in all. The ones not taken by this
+	// transmission (beyond count, a chain the DMR side couldn't fit) stay as they are
+	uint8_t keep = 0;
+	for (uint8_t i = 0; i < aprs_s.dqn; i++) {
+		bool in_tx = i < (uint8_t)count;
+		if (in_tx && (sent || ++aprs_s.dq[i].tries >= RF_TRIES)) {
+			if (!sent) {
+				aprs_s.v.data_failed++;
+			}
+			continue;
+		}
+		if (keep != i) {
+			aprs_s.dq[keep] = aprs_s.dq[i];
+		}
+		keep++;
+	}
+	aprs_s.dqn = keep;
+	aprs_s.dtaken = 0;
+	host_queue_status(sent ? KISS_Q_SENT : KISS_Q_RETRY);
+	aprs_changed();
+	UNLOCK();
+}
+
+void aprs_dlink_channel(uint8_t block, uint32_t talk, bool private_call)
+{
+	LOCK();
+	if (block != aprs_s.dblock || talk != aprs_s.dtalk || private_call != aprs_s.dpriv) {
+		aprs_s.dblock = block;
+		aprs_s.dtalk = talk;
+		aprs_s.dpriv = private_call;
+		aprs_changed();
+	}
+	UNLOCK();
+}
+
+void aprs_dlink_rx(const uint8_t *frame, size_t n, uint32_t now_ms)
+{
+	ax25_frame_t f;
+	bool ok = ax25_decode(frame, n, &f) && f.control == AX25_CONTROL_UI;
+	LOCK();
+	aprs_s.now = now_ms;
+	if (ok && dlink_on()) {
+		aprs_s.v.rx_frames++;
+		host_emit(KISS_CMD_DATA, frame, n);
+		aprs_changed();
+	} else if (!ok) {
+		aprs_s.v.rx_bad++;
+	}
+	UNLOCK();
+}
+#endif
 #endif

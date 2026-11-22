@@ -2439,6 +2439,13 @@ static void handlePacket(const dmrDataPacket_t *packet)
 		dmrDataServiceZoneShareRx(packet->src, packet->group, udp.payload, udp.length);
 	}
 #endif
+#if CONFIG_DATALINK_DMR
+	// A KISS TNC's frame from another radio's data link (docs/spec/aprs.md 9.2)
+	if (!toPc && isUDP && (udp.dstPort == DMR_UDP_PORT_DATA_LINK) && (packet->src != channel.ownId))
+	{
+		dmrDataServiceDataLinkRx(packet->src, packet->group, udp.payload, udp.length, now);
+	}
+#endif
 
 	// The presence server's answer to our registration, or its request for one
 	if (CONFIG_DMR_ARS && !toPc && isUDP && (udp.appPort == DMR_UDP_PORT_ARS) && !packet->group && (packet->src == ars.server) && (ars.server != 0))

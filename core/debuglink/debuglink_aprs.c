@@ -56,7 +56,7 @@ static void view_settings(dl_text_t *t)
 void debuglink_view_aprs(uint8_t part, dl_text_t *t)
 {
 	static const char *const blocks[] = { "ok", "no_call", "no_freq", "not_amateur", "no_position", "no_afsk",
-					      "busy" };
+					      "busy", "not_dmr", "no_dmr_id" };
 	static const char *const srcs[] = { "none", "gps", "host", "fixed" };
 	static const char *const fails[] = { "none", "busy", "aborted", "no_key", "no_afsk", "timeout" };
 	static const char *const whys[] = { "none", "interval", "smart", "turn", "distance", "ptt", "manual", "boot" };
@@ -69,7 +69,7 @@ void debuglink_view_aprs(uint8_t part, dl_text_t *t)
 	aprs_get_view(&v);
 	dl_text(t, "aprs.built=1\naprs.afsk_built=%u\naprs.dmr_built=%u\naprs.rx_built=%u\naprs.igate_built=%u\n",
 		CONFIG_APRS_AFSK, CONFIG_APRS_DMR, CONFIG_APRS_RX, CONFIG_APRS_IGATE);
-	dl_text(t, "aprs.call=%s\naprs.block=%s\naprs.freq_hz=%u\n", v.call, word(v.block, blocks, 7),
+	dl_text(t, "aprs.call=%s\naprs.block=%s\naprs.freq_hz=%u\n", v.call, word(v.block, blocks, 9),
 		(unsigned)v.freq_hz);
 	dl_text(t, "aprs.pos_src=%s\naprs.pos_valid=%u\n", word(v.pos_src, srcs, 4), v.pos_valid);
 	if (v.pos_valid) {
@@ -86,6 +86,14 @@ void debuglink_view_aprs(uint8_t part, dl_text_t *t)
 	dl_text(t, "aprs.rx_frames=%u\naprs.rx_bad=%u\naprs.host_in=%u\naprs.host_out=%u\naprs.host_dropped=%u\n",
 		(unsigned)v.rx_frames, (unsigned)v.rx_bad, (unsigned)v.host_in, (unsigned)v.host_out,
 		(unsigned)v.host_dropped);
+#if CONFIG_DATALINK_DMR
+	// The data link over DMR (aprs.md 9.2): on, what blocks it, where the frames go, what went
+	aprs_cfg_t dc;
+	aprs_get_cfg(&dc);
+	dl_text(t, "aprs.data_dmr=%u\naprs.data_block=%s\naprs.data_tg=%u\naprs.data_private=%u\naprs.data_sent=%u\n"
+		"aprs.data_failed=%u\n", dc.kiss && dc.kiss_data && dc.data_dmr ? 1u : 0u, word(v.data_block, blocks, 9),
+		(unsigned)v.data_tg, v.data_private ? 1u : 0u, (unsigned)v.data_sent, (unsigned)v.data_failed);
+#endif
 	dl_text(t, "aprs.igated=%u\naprs.is_to_rf=%u\naprs.digi_sent=%u\naprs.stations=%u\naprs.messages=%u\n",
 		(unsigned)v.igated, (unsigned)v.is_to_rf, (unsigned)v.digi_sent, v.stations, v.messages);
 	dl_text(t, "aprs.msg_pending=%u\naprs.msg_tries=%u\naprs.msg_acked=%u\naprs.rx_listening=%u\n", v.msg_pending,

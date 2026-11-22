@@ -73,6 +73,7 @@ typedef struct {
 	bool kiss_data;		// data mode: host frames limited only by the queue and CSMA, not the APRS burst rule
 	uint32_t data_hz;	// data mode's frequency (Tools > Data link); 0: the APRS frequency
 	bool data_wide;		// data mode at 25 kHz, else 12.5 kHz
+	bool data_dmr;		// data mode's frames as DMR data on the DMR channel, not FM (CONFIG_DATALINK_DMR)
 	bool to_is;		// our beacons to APRS-IS through the host helper
 	bool rx_on;		// receive on the APRS frequency (boards with a receive path)
 	bool igate;		// RF -> APRS-IS
@@ -96,6 +97,8 @@ bool aprs_callsign_ok(const char *call);
 // Why nothing can be sent now (aprs_view_t.block)
 typedef enum {
 	APRS_OK, APRS_NO_CALL, APRS_NO_FREQ, APRS_NOT_AMATEUR, APRS_NO_POSITION, APRS_NO_AFSK, APRS_BUSY,
+	APRS_NOT_DMR,		// the data link over DMR: not on a DMR channel with a talk target we may send to
+	APRS_NO_DMR_ID,		// ... the radio has no DMR ID
 } aprs_block_t;
 
 // How an RF transmission ended (aprs_rf_done). The failures name the step that stopped it
@@ -108,7 +111,10 @@ typedef struct {
 	uint8_t block;		// aprs_block_t for RF
 	uint32_t freq_hz;
 	uint32_t data_hz;	// KISS data mode's frequency (its own or the APRS one)
-	uint8_t data_block;	// aprs_block_t on it
+	uint8_t data_block;	// aprs_block_t on it (over DMR: on the DMR channel)
+	uint32_t data_tg;	// over DMR: the talk target the frames go to, 0 none
+	bool data_private;	// ... a private call
+	uint32_t data_sent, data_failed;	// over DMR: frames on air, frames given up
 	uint8_t pos_src;	// position_src_t in use
 	bool pos_valid;
 	int32_t lat, lon;
@@ -296,6 +302,29 @@ static inline bool aprs_send_message_opts(const char *to, const char *text, uint
 	return false;
 }
 static inline void aprs_set_test_call(const char *call) { (void)call; }
+#endif
+
+// --- The data link over DMR (CONFIG_DATALINK_DMR, aprs.md 9.2): KISS data mode's host frames as UDP datagrams on the
+// DMR channel instead of FM. The queue is here, the DMR side in aprs_dlink_dmr.c; radio task unless said ---
+#if CONFIG_DATALINK_DMR
+// Room in front of each queued frame for the transport's header (a UDP header), written in place by the taker
+#define APRS_DLINK_HEADROOM	8u
+#define APRS_DLINK_QUEUE	4u	// frames waiting, as the FM queue: the host sees the same free slots
+typedef struct {
+	uint8_t *buf;		// APRS_DLINK_HEADROOM octets, then the AX.25 frame; stays put until aprs_dlink_done
+	uint16_t len;		// the frame's octets (after the headroom)
+} aprs_dlink_frame_t;
+// Data mode over DMR is on (the host's frames wait here, not in the FM queue)
+bool aprs_dlink_on(void);
+// The queued frames not yet taken, oldest first, at most max: they stay queued until aprs_dlink_done
+int aprs_dlink_take(aprs_dlink_frame_t *out, int max);
+// The first count frames taken last went out (sent) or failed; failed ones are tried again a few times, then dropped.
+// count 0: none was started, all go back to the queue untouched
+void aprs_dlink_done(int count, bool sent);
+// What the DMR channel allows now (aprs_block_t: APRS_OK, APRS_NOT_DMR, APRS_NO_DMR_ID) and where the frames go
+void aprs_dlink_channel(uint8_t block, uint32_t talk, bool private_call);
+// A frame heard on the data link (any task): to the host as a received KISS frame, nothing else
+void aprs_dlink_rx(const uint8_t *frame, size_t n, uint32_t now_ms);
 #endif
 
 #endif

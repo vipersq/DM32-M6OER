@@ -49,6 +49,25 @@ void dmrDataServiceZoneShareRx(uint32_t src, bool group, const uint8_t *payload,
 	zsRxFirst = (length > 0) ? payload[0] : 0;
 }
 
+// The data link's receive hook (aprs_dlink_dmr.c in the firmware): what the service handed it
+static int dlRxCalls;
+static uint32_t dlRxSrc;
+static bool dlRxGroup;
+static int dlRxLength;
+static uint8_t dlRxData[DMR_DATA_IP_MTU];
+void dmrDataServiceDataLinkRx(uint32_t src, bool group, const uint8_t *payload, int length, uint32_t nowMs)
+{
+	(void)nowMs;
+	dlRxCalls++;
+	dlRxSrc = src;
+	dlRxGroup = group;
+	dlRxLength = length;
+	if ((length > 0) && (length <= (int)sizeof(dlRxData)))
+	{
+		memcpy(dlRxData, payload, (size_t)length);
+	}
+}
+
 static bool haveLocation = false;
 static int positionLatMinutes = 0;// the test moves the radio north by this many 1/10000 minutes
 static bool fakeOwnPosition(lrrpPosition_t *position, uint32_t nowMs, void *ctx)
@@ -2552,6 +2571,102 @@ static void testPrivacy(void)
 }
 #endif
 
+// The data link (docs/spec/aprs.md 9.2): KISS frames as UDP datagrams to port DMR_UDP_PORT_DATA_LINK, several in one
+// transmission, sent as aprs_dlink_dmr.c sends them and heard by another radio on the channel; the packets it must
+// leave alone
+static void dlUdp(uint8_t *l4, uint16_t srcPort, uint16_t dstPort, int frameLength, uint8_t seed)
+{
+	int n = 8 + frameLength;
+	l4[0] = srcPort >> 8;
+	l4[1] = srcPort & 0xFF;
+	l4[2] = dstPort >> 8;
+	l4[3] = dstPort & 0xFF;
+	l4[4] = (uint8_t)(n >> 8);
+	l4[5] = (uint8_t)n;
+	l4[6] = l4[7] = 0;
+	for (int i = 0; i < frameLength; i++)
+	{
+		l4[8 + i] = (uint8_t)(seed + i * 7);
+	}
+}
+
+// Send from us, then hear it as RADIO_B: how many frames the hook got
+static int dlRoundTrip(bool group, uint32_t dst, const dmrDataChainPacket_t *p, int n, int *taken)
+{
+	dmrBurst_t heard[DMR_DATA_MAX_BURSTS];
+	reset();
+	decodeTx = false;
+	lastTxCount = 0;
+	*taken = dmrDataServiceSendIPChain(group, dst, DMR_DATA_IP_OURS, DMR_DATA_IP_OURS, DMR_IP_TTL_DEFAULT, p, n);
+	runMainTask(3000);
+	decodeTx = true;
+	int count = lastTxCount;
+	memcpy(heard, lastTx, (size_t)count * sizeof(dmrBurst_t));
+	CHECK(!dmrDataServiceIpBusy() && (dmrDataServiceIpResult() == DMR_REQ_OK));
+	ch.ownId = RADIO_B;
+	runMainTask(20);
+	dlRxCalls = 0;
+	rxBursts(heard, count);
+	runMainTask(20);
+	ch.ownId = OUR_ID;
+	runMainTask(20);
+	return dlRxCalls;
+}
+
+static void testDataLink(void)
+{
+	static uint8_t a[8 + 300], b[8 + 40];
+	int taken;
+
+	// Two frames, a long one and a position-sized one, to the channel's talkgroup: one transmission, both heard
+	dlUdp(a, DMR_UDP_PORT_DATA_LINK, DMR_UDP_PORT_DATA_LINK, 300, 1);
+	dlUdp(b, DMR_UDP_PORT_DATA_LINK, DMR_UDP_PORT_DATA_LINK, 40, 99);
+	dmrDataChainPacket_t p[2] = {
+		{ DMR_IP_PROTO_UDP, DMR_IPS_UNCONFIRMED, a, 8 + 300 },
+		{ DMR_IP_PROTO_UDP, DMR_IPS_UNCONFIRMED, b, 8 + 40 },
+	};
+	int heard = dlRoundTrip(true, 9, p, 2, &taken);
+	CHECK((taken >= 1) && (heard == taken));
+	CHECK((dlRxSrc == OUR_ID) && dlRxGroup);
+	CHECK((taken == 2) ? ((dlRxLength == 40) && (memcmp(dlRxData, &b[8], 40) == 0)) :
+		  ((dlRxLength == 300) && (memcmp(dlRxData, &a[8], 300) == 0)));
+	// The longest frame RadioLink sends on its own, compressed header
+	heard = dlRoundTrip(true, 9, p, 1, &taken);
+	CHECK((taken == 1) && (heard == 1) && (dlRxLength == 300) && (memcmp(dlRxData, &a[8], 300) == 0));
+	// A private call: to the radio that hears it
+	heard = dlRoundTrip(false, RADIO_B, p, 1, &taken);
+	CHECK((taken == 1) && (heard == 1) && !dlRxGroup);
+
+	// EP: not for the data link. Another talkgroup (not listened to), another radio, the ports either side
+	heard = dlRoundTrip(true, 92, p, 1, &taken);
+	CHECK((taken == 1) && (heard == 0));
+	heard = dlRoundTrip(false, RADIO_C, p, 1, &taken);
+	CHECK((taken == 1) && (heard == 0));
+	static const uint16_t ports[][2] = { { 4200, 4199 }, { 4200, 4201 }, { 4200, 4007 } };
+	for (unsigned i = 0; i < sizeof(ports) / sizeof(ports[0]); i++)
+	{
+		dlUdp(b, ports[i][0], ports[i][1], 40, 5);
+		dmrDataChainPacket_t q = { DMR_IP_PROTO_UDP, DMR_IPS_UNCONFIRMED, b, 8 + 40 };
+		heard = dlRoundTrip(true, 9, &q, 1, &taken);
+		CHECK((taken == 1) && (heard == 0));
+	}
+	// Its own, repeated back: not handed on
+	dlUdp(b, DMR_UDP_PORT_DATA_LINK, DMR_UDP_PORT_DATA_LINK, 40, 5);
+	dmrBurst_t own[DMR_DATA_MAX_BURSTS];
+	reset();
+	decodeTx = false;
+	dmrDataChainPacket_t q = { DMR_IP_PROTO_UDP, DMR_IPS_UNCONFIRMED, b, 8 + 40 };
+	CHECK(dmrDataServiceSendIPChain(true, 9, DMR_DATA_IP_OURS, DMR_DATA_IP_OURS, DMR_IP_TTL_DEFAULT, &q, 1) == 1);
+	runMainTask(3000);
+	decodeTx = true;
+	int count = lastTxCount;
+	memcpy(own, lastTx, (size_t)count * sizeof(dmrBurst_t));
+	dlRxCalls = 0;
+	rxBursts(own, count);
+	runMainTask(20);
+	CHECK(dlRxCalls == 0);
+}
+
 int main(void)
 {
 	testNoRate34();
@@ -2582,6 +2697,7 @@ int main(void)
 	testConfirmedRx();
 	testIpText();
 	testNmeaPosition();
+	testDataLink();
 	testNotForUsIsolation();
 	testPassthrough();
 	testTxGuard();

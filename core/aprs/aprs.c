@@ -65,6 +65,7 @@ static void cfg_from_settings(const settings_t *s, aprs_cfg_t *c)
 	c->kiss_data = (f2 & SETTINGS_APRS2_KISS_DATA) != 0;
 	c->data_wide = (f2 & SETTINGS_APRS2_DATA_WIDE) != 0;
 	c->data_hz = s->data_hz;
+	c->data_dmr = CONFIG_DATALINK_DMR && (s->data_flags & SETTINGS_DATA_DMR) != 0;
 	c->region = s->aprs_region < APRS_REGION_COUNT ? s->aprs_region : APRS_REGION_NA;
 	c->ssid = s->aprs_ssid <= 15 ? s->aprs_ssid : APRS_SSID_DEFAULT;
 	c->freq_hz = s->aprs_freq_hz;
@@ -106,6 +107,7 @@ static void cfg_to_settings(const aprs_cfg_t *c, settings_t *s)
 	s->aprs_ssid = c->ssid;
 	s->aprs_freq_hz = c->freq_hz;
 	s->data_hz = c->data_hz;
+	s->data_flags = (uint8_t)((s->data_flags & ~SETTINGS_DATA_DMR) | (c->data_dmr ? SETTINGS_DATA_DMR : 0));
 	s->aprs_dmr_dst = c->dmr_dst;
 	s->aprs_interval_s = c->interval_s;
 	s->aprs_distance_m = c->distance_m;

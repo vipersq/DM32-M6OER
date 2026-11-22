@@ -333,6 +333,10 @@ void dmrDataBuildEmergencyAlarm(uint32_t dst, uint32_t src, bool group, uint8_t 
 // zoneShareSvc.c has it
 void dmrDataServiceZoneShareRx(uint32_t src, bool group, const uint8_t *payload, int length);
 
+// The data link (CONFIG_DATALINK_DMR, docs/spec/aprs.md 9.2): a UDP datagram to DMR_UDP_PORT_DATA_LINK for us (or a
+// group we listen to), not left to the PC, not our own. core/aprs/aprs_dlink_dmr.c has it
+void dmrDataServiceDataLinkRx(uint32_t src, bool group, const uint8_t *payload, int length, uint32_t nowMs);
+
 // Control station passthrough (CONFIG_DMR_CONTROL_STATION, docs/spec/usb-network.md 5): while on, IP based packets
 // (SAP 4, SAP 3) to us or our groups are left to the PC on the USB network link: no TMS ACK, no inbox entry, no ARS
 // or LRRP handling; our own ARS registration and LRRP reports stop. The link layer stays here (ETSI responses to

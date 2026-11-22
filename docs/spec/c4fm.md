@@ -378,3 +378,7 @@ where it is now (settings.c `fork_record_move`); the stored power levels go back
   only, or sends and listens (on that frequency in FM). APRS beacons stay on the APRS frequency ([aprs.md 9](aprs.md)).
 - The host's 'Q' query (KISS SetHardware) answers the queue, why the data frequency is blocked, the KISS mode and the
   callsign, without transmitting; RadioLink's "Check radio" uses it.
+- Mode (row 4): FM, or DMR: the host's frames go as DMR data on the DMR channel the radio is on, to its talkgroup
+  (UDP port 4200, compressed header, unconfirmed), and those heard there come back to the host
+  ([aprs.md 9.2](aprs.md#92-data-link-over-dmr)). The body names the talkgroup, or says what is missing (a DMR channel
+  with a talkgroup, a DMR ID). The status answer's mode is then 3.
