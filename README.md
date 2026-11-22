@@ -13,6 +13,8 @@
 > that radio unusable.
 
 Kriss M6OER's own firmware for the DM-32UV: **FM, DMR, C4FM (Yaesu System Fusion), P25 and NXDN in one firmware**.
+Together with the [RadioLink](https://github.com/vipersq/RadioLink) ATAK plugin it turns the radio into **ATAK's
+modem**: chat, positions, markers, plugin reports and DMR voice over the air, with the phone on the programming cable.
 It is built on [RadioFoundry C4FM](https://github.com/lycanananas/RadioFoundryC4FM), which is built on
 [RadioFoundry](https://radiofoundry.org). Not affiliated with either project.
 
@@ -31,6 +33,33 @@ It is built on [RadioFoundry C4FM](https://github.com/lycanananas/RadioFoundryC4
 | Data | APRS with messaging and SmartBeaconing; a KISS TNC on the programming cable; Tools > Data link for [RadioLink](https://github.com/vipersq/RadioLink) (ATAK over radio): in FM on a frequency of its own, or as DMR data on a DMR channel's talkgroup; DMR voice through the phone (its microphone and speaker over the same cable, [aprs.md 9.5](docs/spec/aprs.md#95-dmr-voice-over-the-host-port)) |
 
 What changed in this build, in detail: [docs/spec/c4fm.md](docs/spec/c4fm.md).
+
+## RadioLink: ATAK over your radio
+
+[RadioLink](https://github.com/vipersq/RadioLink) is an ATAK plugin (ATAK 5.6 / 5.8) that uses this firmware as ATAK's
+radio modem. The phone connects to the radio's programming cable with a USB OTG adapter (or a Digirig); RadioLink
+also works with other KISS radios over Bluetooth. Set the radio up in **Tools > Data link**.
+
+| What | How it works |
+|---|---|
+| Chat, positions, markers, plugin reports | ATAK's own chat (All Chat Rooms and direct), your position with team, role and battery, markers and reports from other plugins (Casualty Kit, TakRequest) go over the air and appear on the other phones as if from the network |
+| FM or DMR | FM: 1200 baud on a data frequency of your own. DMR (v1.4.0+): DMR data on the channel's talkgroup |
+| Reliable delivery | no loops or duplicates; lost fragments are asked for again and resent; alerts first, positions last and always fresh; the radio tells RadioLink how full its queue is |
+| Relay (mesh) | stations in the middle repeat what they hear, up to 4 hops (the sender chooses); positions at most 2 |
+| SOS | a 911 Alert to every station, from the plugin or from the radio's Data link SOS key (v1.5.0+) |
+| Plain DMR radios | their GPS positions and text messages appear in ATAK; a chat to them goes back as a DMR text (v1.5.0+) |
+| Voice through the phone | on a DMR channel the phone is the radio's microphone and speaker over the same cable, with a floating PTT button over the map (v1.6.0+). The radio keeps the AMBE vocoder; the cable carries ADPCM |
+| Link quality | for each station: last heard, frames, reports whole, repaired or lost |
+| Tests | Check radio (nothing transmitted), Send test frame, Check ATAK |
+
+Setup in short: Tools > Data link > **KISS on USB: Data**; a DMR channel (or the data frequency in FM); the radio's
+callsign the same as RadioLink's; cable to the phone; **Start** and **Check radio** in RadioLink. The full guide is in
+the [release notes](https://github.com/vipersq/DM32-M6OER/releases/latest) and
+[RadioLink's README](https://github.com/vipersq/RadioLink#readme). The protocol on the cable:
+[docs/spec/aprs.md](docs/spec/aprs.md) 9.
+
+Amateur radio rules apply: no encryption, and your callsign identifies every frame. Not yet tested on air: reports
+welcome.
 
 ## Installing
 
