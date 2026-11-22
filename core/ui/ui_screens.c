@@ -381,6 +381,11 @@ static int draw_top_as(const radio_view_t *v, radio_state_t st, const ui_state_t
 	if (st == RS_IDLE && s->dual.on && s->dual.rx != UI_DUAL_NONE)
 		st = RS_RX;	// a channel's own receiver (two receivers) hears a call the view's one doesn't show
 #endif
+	if (s->data_sos && st == RS_IDLE) {	// the SOS stays in sight on every screen until cancelled
+		word = "SOS";
+		pbg = ui_col.warn;
+		pfg = ui_col.pill_dark_fg;
+	}
 	switch (st) {
 	case RS_RX: word = "RX"; pbg = ui_col.rx; pfg = ui_col.pill_dark_fg; break;
 	case RS_TX: word = v->aprs_tx ? "TX APRS" : "TX"; pbg = ui_col.tx; break;
@@ -396,13 +401,13 @@ static int draw_top_as(const radio_view_t *v, radio_state_t st, const ui_state_t
 	bool filled = CONFIG_UI_COLOR && ui_strip_fill && gfx_bpp() != 1;
 	color_t sbg = filled ? ui_col.strip_bg : ui_col.bg, sfg = filled ? ui_col.pill_dark_fg : ui_col.fg;
 	color_t swarn = filled ? ui_col.strip_warn : ui_col.warn;
-	if (filled && st == RS_IDLE) {
+	if (filled && st == RS_IDLE && !s->data_sos) {
 		pbg = sfg;
 		pfg = sbg;
 	}
 	gfx_fill(0, 0, w, L->strip_h, sbg);
 	int x = 0;
-	if (!merged || st != RS_IDLE) {
+	if (!merged || st != RS_IDLE || s->data_sos) {
 		if (filled) {
 			// On the filled strip the pill is the strip's full height (a one-cell pill leaves a line of the
 			// strip's color under it) against the bezel, its corners rounded by two pixels. Left of its middle the

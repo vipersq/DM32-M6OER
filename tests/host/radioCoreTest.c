@@ -13,6 +13,7 @@
 #include "aprs/aprs_beacon.h"	// APRS_WHY_*
 #if CONFIG_DATALINK_DMR
 #include "aprs/kiss.h"		// the data link test reads the host's stream
+#include "aprs/aprs_host.h"	// ... and writes to it
 #endif
 #endif
 #include "radio/radio_sfr.h"
@@ -3457,6 +3458,61 @@ static void test_datalink_dmr(void)
 		seen = seen || memcmp(&out[i], want, wn) == 0;
 	}
 	CHECK(seen);
+
+	// A relay's frame (another station as the source, our call first in the path, repeated): taken in data mode;
+	// another station's frame without it: refused
+	{
+		ax25_frame_t rf;
+		static uint8_t info[40];
+		memset(&rf, 0, sizeof rf);
+		memset(info, 'r', sizeof info);
+		info[0] = '{';
+		info[1] = 'T';
+		CHECK(ax25_addr_parse("TAKRF", 5, &rf.dst) && ax25_addr_parse("M0ABC-7", 7, &rf.src) &&
+		      ax25_addr_parse("Q0TST", 5, &rf.digi[0]) && ax25_addr_parse("NOGATE", 6, &rf.digi[1]));
+		rf.ndigi = 2;
+		rf.digi[0].h = true;
+		rf.control = AX25_CONTROL_UI;
+		rf.pid = AX25_PID_NONE;
+		rf.info = info;
+		rf.info_len = sizeof info;
+		fn = ax25_encode(&rf, fr, sizeof fr);
+		CHECK(aprs_host_frame(fr, fn, now));
+		rf.digi[0].h = false;
+		fn = ax25_encode(&rf, fr, sizeof fr);
+		CHECK(!aprs_host_frame(fr, fn, now));
+		run(6000);
+		dlink_host(out, sizeof out);
+	}
+
+	// The SOS key's alert to the host, and its end
+	CHECK(aprs_host_sos(true));
+	n = dlink_host(out, sizeof out);
+	static const uint8_t sos_on[] = { KISS_FEND, KISS_CMD_SETHW, KISS_TAG_SOS, 1, KISS_FEND };
+	CHECK(n == sizeof sos_on && memcmp(out, sos_on, n) == 0);
+	aprs_get_view(&v);
+	CHECK(v.sos);
+	CHECK(aprs_host_sos(false));
+	dlink_host(out, sizeof out);
+
+	// Plain DMR radios (aprs.md 9.4): a position heard and a text to the host, the host's text to one on air
+	aprs_dmr_heard(2351619, "M0XYZ John", 510700000, -17900000, now);
+	n = dlink_host(out, sizeof out);
+	static const uint8_t dpos[] = { KISS_FEND, KISS_CMD_SETHW, KISS_TAG_DMR, 'P', 0x00, 0x23, 0xE2, 0x03,
+					0x1E, 0x70, 0xA9, 0xE0, 0xFE, 0xEE, 0xDE, 0x20, 'M', '0', 'X', 'Y', 'Z' };
+	CHECK(n > sizeof dpos && memcmp(out, dpos, sizeof dpos) == 0);
+	aprs_dlink_dmr_text_heard(2351619, "hi there");
+	n = dlink_host(out, sizeof out);
+	CHECK(n == 17 && out[2] == KISS_TAG_DMR && out[3] == 'S' && out[6] == 0xE2 && memcmp(&out[8], "hi there", 8) == 0);
+	{
+		// To the talkgroup (no acknowledgement to wait for)
+		uint8_t cmd[] = { KISS_CMD_SETHW, KISS_TAG_DMR, 'S', 0x00, 0x00, 0x00, 201, 1, 'o', 'k' };
+		first = sim.air_count;
+		aprs_host_kiss_frame(cmd, sizeof cmd, now);
+		run(4000);
+		CHECK(sim.air_count > first);	// the text message went out as DMR data
+		CHECK(!dmrDataServiceIsBusy());
+	}
 
 	// Off DMR (an FM channel): refused, and the answer says why
 	req(RREQ_ZONE_POS, 0);

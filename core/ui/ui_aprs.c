@@ -20,6 +20,7 @@ WEAK bool ui_svc_aprs_view(aprs_view_t *v) { memset(v, 0, sizeof(*v)); return fa
 WEAK void ui_svc_aprs_cfg(aprs_cfg_t *c) { memset(c, 0, sizeof(*c)); }
 WEAK void ui_svc_aprs_set_cfg(const aprs_cfg_t *c) { (void)c; }
 WEAK bool ui_svc_aprs_send_now(void) { return false; }
+WEAK int ui_svc_data_sos_toggle(void) { return -1; }
 WEAK bool ui_svc_aprs_send_message(const char *to, const char *text, uint8_t flags)
 {
 	(void)to;

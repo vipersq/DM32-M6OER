@@ -471,6 +471,8 @@ static void aprs_sim_reset(void)
 	aprs_sim.cfg.path = APRS_PATH_WIDE1_WIDE2;
 	aprs_sim.cfg.level = 50;
 }
+// The data link's SOS: on with KISS on, shown as the SOS pill
+static bool sim_sos;
 bool ui_svc_aprs_view(aprs_view_t *v)
 {
 	static const uint32_t hz[APRS_REGION_COUNT] = { 144390000, 144800000, 145175000, 144575000, 144640000, 144640000, 0 };
@@ -490,6 +492,7 @@ bool ui_svc_aprs_view(aprs_view_t *v)
 	v->stations = 2;
 	v->messages = aprs_sim.message ? 1 : 0;
 	v->unread = aprs_sim.message && !aprs_sim.message_read ? 1 : 0;
+	v->sos = sim_sos;
 	return true;
 }
 void ui_svc_aprs_cfg(aprs_cfg_t *c) { *c = aprs_sim.cfg; }
@@ -500,6 +503,13 @@ bool ui_svc_aprs_send_now(void)
 		return false;
 	aprs_sim.sent++;
 	return true;
+}
+int ui_svc_data_sos_toggle(void)
+{
+	if (aprs_sim.off || !aprs_sim.cfg.kiss)
+		return -1;
+	sim_sos = !sim_sos;
+	return sim_sos ? 1 : 0;
 }
 uint8_t ui_svc_aprs_station_count(void) { return aprs_sim.off || aprs_sim.evicted ? 0 : 2; }
 bool ui_svc_aprs_station(uint8_t i, aprs_station_t *out)

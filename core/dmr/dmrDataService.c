@@ -2338,6 +2338,9 @@ static void inboxStore(uint32_t src, uint32_t dst, bool group, uint8_t seq, uint
 	unlock();
 	stats.smsReceived++;
 	post(DMR_DATA_EV_SMS_RECEIVED, src);
+#if CONFIG_DATALINK_DMR
+	dmrDataServiceDataLinkText(src, text);
+#endif
 }
 
 static void handlePacket(const dmrDataPacket_t *packet)

@@ -43,6 +43,12 @@ bool ui_svc_aprs_send_now(void)
 	return aprs_send_now();
 }
 
+int ui_svc_data_sos_toggle(void)
+{
+	bool on = !aprs_host_sos_on();
+	return aprs_host_sos(on) ? (on ? 1 : 0) : -1;
+}
+
 bool ui_svc_aprs_send_message(const char *to, const char *text, uint8_t flags)
 {
 	return aprs_send_message_opts(to, text, flags);

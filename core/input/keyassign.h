@@ -50,6 +50,9 @@ typedef enum {
 #define KEYFN_TAC_TONES		201u
 #define KEYFN_ROGER		202u
 #define KEYFN_APRS_SEND		203u
+// The data link's SOS: an alert to the KISS host (RadioLink raises it in ATAK), again to cancel. Long press only, as
+// Emergency (CONFIG_APRS_AFSK)
+#define KEYFN_DATA_SOS		204u
 
 // fn may go in a press (hold false) or long press slot
 bool keyassign_allowed(uint8_t fn, bool hold);

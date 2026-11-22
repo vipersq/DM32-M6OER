@@ -409,6 +409,34 @@ and `radioCoreTestAprs` (`test_datalink_dmr`: host frames to the air decoded bac
 flight, another radio's frame to the host, the status answer's mode and block, off a DMR channel). UI:
 `c4fmUiSmoke.sh` opens the screen in both modes. Not tested on air yet.
 
+### 9.3 Relayed frames and the SOS key
+
+**Relayed frames.** In data mode the host may hand over another station's frame to repeat: its source is that
+station, our callsign is the first address of its path with the H bit set (we repeated it), so our callsign still
+identifies the transmission. Any other foreign source is refused, as before. RadioLink's relay (off by default) sends
+frames this way.
+
+**SOS.** A side key's long press may be **Data link SOS** (`KEYFN_DATA_SOS`, 204, long press only so a knock can't
+raise it; Settings > Keys). It tells the KISS host SetHardware `S` then 1, and again `S` 0 to cancel; with KISS off
+nothing is sent and a toast says so. While it is on, the strip's pill reads SOS on every screen. The radio sends
+nothing on air itself: the host does (RadioLink: a 911 Alert at the phone's position, first in its queue).
+`aprs_view_t.sos` holds the state.
+
+### 9.4 Plain DMR radios
+
+Built with the data link over DMR. In data mode (FM or DMR) the host also hears plain DMR radios, as SetHardware `D`:
+
+| Direction | Kind | Payload |
+|---|---|---|
+| to the host | `P` position | the radio's ID (32 bits, big-endian), lat and lon in 1e-7 degrees (32 bits each), its talker alias or ID-database name |
+| to the host | `S` text | the sender's ID (32 bits), the text: every message the DMR inbox takes (to us, or a group we listen to) |
+| from the host | `S` text | the ID (32 bits), 1 talkgroup / 0 private, the text: sent as the radio's own DMR text message (acknowledged when private) |
+
+Positions are the ones the station list takes (`aprs_dmr_heard`: GPS in a voice call, DMR APRS NMEA), sent when they
+change. Host tests: `radioCoreTestAprs` (`test_datalink_dmr`: a relayed frame taken and a foreign one refused, the SOS
+on and off, a position and a text to the host, the host's text on air), `dmrDataServiceTest` (the inbox's text hook),
+`keyassignTest` (204: long press only).
+
 ## 10. UI
 
 Tools > APRS (`ui_aprs.c`): the body shows the callsign and frequency, why nothing can be sent (no callsign, no

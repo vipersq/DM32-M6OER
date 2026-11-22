@@ -60,6 +60,13 @@ void aprs_host_kiss_frame(const uint8_t *f, size_t n, uint32_t now_ms)
 		} else if (n == 2 && f[1] == KISS_TAG_QUEUE) {
 			aprs_host_status_query();	// a host checking the link (RadioLink's radio test): nothing goes on air
 		}
+#if CONFIG_DATALINK_DMR
+		else if (n >= 9 && f[1] == KISS_TAG_DMR && f[2] == 'S') {
+			// A text for a plain DMR radio (aprs.md 9.4): ID (24 bits in 32), 1 group / 0 private, then the text
+			uint32_t id = ((uint32_t)f[3] << 24) | ((uint32_t)f[4] << 16) | ((uint32_t)f[5] << 8) | f[6];
+			aprs_dlink_dmr_text(id, f[7] != 0, (const char *)f + 8, n - 8u);
+		}
+#endif
 		break;
 	default:
 		break;		// TXDELAY, persistence, slot time: the radio's own settings and CSMA apply (aprs.md 9)

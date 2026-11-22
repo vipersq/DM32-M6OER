@@ -29,6 +29,9 @@
 #define KISS_TAG_IS_LINE	'G'	// SetHardware: an APRS-IS (TNC2) line
 #define KISS_TAG_NMEA		'N'	// SetHardware: an NMEA sentence
 #define KISS_TAG_QUEUE		'Q'	// SetHardware to the host, data mode: free queue slots, then a KISS_Q_* event
+#define KISS_TAG_SOS		'S'	// SetHardware to the host: the SOS key, then 1 (alert) or 0 (cancelled)
+#define KISS_TAG_DMR		'D'	// SetHardware, data mode: plain DMR radios (aprs.md 9.4). To the host 'P' a position
+					// (ID, lat, lon, its name) or 'S' a text (ID, text); from it 'S' (ID, group, text)
 #define KISS_Q_QUEUED		0u	// a host frame was queued
 #define KISS_Q_DROPPED		1u	// a host frame was refused (queue full, no callsign, blocked)
 #define KISS_Q_SENT		2u	// a transmission went out

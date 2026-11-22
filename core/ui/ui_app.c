@@ -2367,6 +2367,16 @@ void ui_app_key(const input_event_t *ev)
 				TR(APRS_TOAST_CANT_SEND_NOW, "Can't send now"));
 			return;
 #endif
+#if CONFIG_APRS_AFSK
+		case ACT_DATA_SOS: {
+			// The data link's SOS (aprs.md 9.3): on, or off when it is on; RadioLink raises the alert in ATAK.
+			// No view copy here: this frame is on the UI task's deepest path
+			int r = ui_svc_data_sos_toggle();
+			ui_toast(r < 0 ? TR(DATALINK_TOAST_SOS_NO_KISS, "SOS: KISS on USB is off") :
+				 r > 0 ? TR(DATALINK_TOAST_SOS_ON, "SOS sent") : TR(DATALINK_TOAST_SOS_OFF, "SOS cancelled"));
+			return;
+		}
+#endif
 #endif
 		case ACT_VOLUME:
 			if (!(ui_svc_features() & UI_FEAT_VOLUME))
@@ -2721,6 +2731,11 @@ bool ui_app_tick(const radio_view_t *v, uint32_t now_ms)
 		unread += aprs_view.unread;
 	if (unread != ui_st.unread) {
 		ui_st.unread = unread;
+		dirty = true;
+	}
+	bool sos = aprs_view.sos;	// zeroed when APRS isn't there
+	if (sos != ui_st.data_sos) {
+		ui_st.data_sos = sos;
 		dirty = true;
 	}
 	bool scanning = v->scan != 0 && v->scan != 3;	// 3: dual watch, which Home shows on its own (ui_dual.c)

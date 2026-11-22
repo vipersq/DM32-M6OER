@@ -6719,6 +6719,9 @@ static const int16_t v_keyfn_hold[] = { KEYFN_DEFAULT, KEYFN_NONE, KEYFN_TALK_TA
 #if CONFIG_APRS
 					 KEYFN_APRS_SEND,
 #endif
+#if CONFIG_APRS_AFSK
+					 KEYFN_DATA_SOS,
+#endif
 #endif
 };
 static const tr_id_t n_keyfn_hold[] = { TRN(VALUE_DEFAULT, "Default"), TRN(KEYFN_VALUE_NOTHING, "Nothing"),
@@ -6745,6 +6748,9 @@ static const tr_id_t n_keyfn_hold[] = { TRN(VALUE_DEFAULT, "Default"), TRN(KEYFN
 					     TRN(KEYFN_VALUE_ROGER, "Roger on/off"),
 #if CONFIG_APRS
 					     TRN(KEYFN_VALUE_APRS_SEND, "APRS position"),
+#endif
+#if CONFIG_APRS_AFSK
+					     TRN(KEYFN_VALUE_DATA_SOS, "Data link SOS"),
 #endif
 #endif
 };

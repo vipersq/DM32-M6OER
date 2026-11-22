@@ -14,6 +14,8 @@ bool ui_svc_aprs_view(aprs_view_t *v);
 void ui_svc_aprs_cfg(aprs_cfg_t *c);
 void ui_svc_aprs_set_cfg(const aprs_cfg_t *c);
 bool ui_svc_aprs_send_now(void);
+// The data link's SOS on, or off when it is on, told to the KISS host: 1 on, 0 off, -1 KISS off (nothing sent)
+int ui_svc_data_sos_toggle(void);
 bool ui_svc_aprs_send_message(const char *to, const char *text, uint8_t flags);
 uint8_t ui_svc_aprs_msg_count(void);
 bool ui_svc_aprs_msg(uint8_t i, aprs_msg_t *out, bool read);

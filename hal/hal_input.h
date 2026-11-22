@@ -27,8 +27,8 @@ typedef enum {
 	ACT_TONE_BURST,		// FM repeater access: raw down / up edges
 	ACT_TALK_LABEL,		// Home's talk line: the talkgroup's name or its number first (a side key function)
 	// The C4FM build's side key functions: the red tactical screen, the tactical tones, the roger sound, an APRS
-	// position now (each on / off, a toast says which)
-	ACT_TACTICAL, ACT_TAC_TONES, ACT_ROGER, ACT_APRS_SEND,
+	// position now (each on / off, a toast says which), the data link's SOS (on / off, to the KISS host)
+	ACT_TACTICAL, ACT_TAC_TONES, ACT_ROGER, ACT_APRS_SEND, ACT_DATA_SOS,
 	// A home key with a function set (board.home_keys, keyassign.h): the UI turns it into that function on Home and
 	// back into the key's own action elsewhere. The gesture says press or long press
 	ACT_HOME_KEY_1, ACT_HOME_KEY_2, ACT_HOME_KEY_3, ACT_HOME_KEY_4,

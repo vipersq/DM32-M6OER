@@ -4,6 +4,7 @@
 #include "config.h"
 #include "aprs/aprs_dlink_dmr.h"
 #if CONFIG_DATALINK_DMR	// the whole file
+#include <string.h>
 #include "aprs/aprs.h"
 #include "dmr/dmrData.h"
 #include "dmr/dmrDataService.h"
@@ -68,6 +69,26 @@ void aprs_dlink_dmr_tick(const aprs_dlink_dmr_channel_t *ch, uint32_t now_ms)
 	}
 	sending = true;
 	sending_n = k;
+}
+
+void dmrDataServiceDataLinkText(uint32_t src, const char *text)
+{
+	aprs_dlink_dmr_text_heard(src, text);
+}
+
+bool aprs_dlink_dmr_text(uint32_t dst, bool group, const char *text, size_t n)
+{
+	char t[DMR_DATA_TEXT_MAX + 1];
+	if (dst == 0 || dst > 0xFFFFFFu || n == 0) {
+		return false;
+	}
+	if (n > DMR_DATA_TEXT_MAX) {
+		n = DMR_DATA_TEXT_MAX;	// a chat line is shorter; the radio's own limit otherwise
+	}
+	memcpy(t, text, n);
+	t[n] = '\0';
+	// Acknowledged when private, as the radio's own messages; the result shows in the radio's message log
+	return dmrDataServiceSendSMS(group, dst, t, !group);
 }
 
 void dmrDataServiceDataLinkRx(uint32_t src, bool group, const uint8_t *payload, int length, uint32_t nowMs)

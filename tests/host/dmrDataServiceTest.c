@@ -68,6 +68,15 @@ void dmrDataServiceDataLinkRx(uint32_t src, bool group, const uint8_t *payload, 
 	}
 }
 
+// ... and its text hook: the last text the inbox took
+static char dlText[DMR_DATA_TEXT_MAX + 1];
+static uint32_t dlTextSrc;
+void dmrDataServiceDataLinkText(uint32_t src, const char *text)
+{
+	dlTextSrc = src;
+	strncpy(dlText, text, sizeof(dlText) - 1);
+}
+
 static bool haveLocation = false;
 static int positionLatMinutes = 0;// the test moves the radio north by this many 1/10000 minutes
 static bool fakeOwnPosition(lrrpPosition_t *position, uint32_t nowMs, void *ctx)
@@ -904,6 +913,7 @@ static void testBlockWindow(void)
 	runMainTask(500);
 	CHECK(stats.smsReceived == received + 1);
 	CHECK(sentCount == 0);
+	CHECK((dlTextSrc == RADIO_A) && (strcmp(dlText, "to 91") == 0));	// the data link's host hears it too
 	// Group 92 isn't
 	count = dmrDataBuildTMS(true, 92, RADIO_A, "to 92", 33, false, DMR_TYPE_RATE_1, 1, bursts, DMR_DATA_MAX_BURSTS);
 	rxBursts(bursts, count);

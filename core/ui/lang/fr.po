@@ -728,6 +728,21 @@ msgid "Can't send now"
 msgstr "Envoi impossible"
 
 #: core/ui/ui_app.c
+msgctxt "DATALINK_TOAST_SOS_NO_KISS"
+msgid "SOS: KISS on USB is off"
+msgstr "SOS : KISS USB désactivé"
+
+#: core/ui/ui_app.c
+msgctxt "DATALINK_TOAST_SOS_ON"
+msgid "SOS sent"
+msgstr "SOS envoyé"
+
+#: core/ui/ui_app.c
+msgctxt "DATALINK_TOAST_SOS_OFF"
+msgid "SOS cancelled"
+msgstr "SOS annulé"
+
+#: core/ui/ui_app.c
 msgctxt "HOME_TOAST_VOLUME_USE_KNOB"
 msgid "Volume: use the knob"
 msgstr "Volume : via bouton"
@@ -1090,7 +1105,7 @@ msgstr "Liaison données"
 #: core/ui/ui_aprs.c
 msgctxt "DATALINK_HINT_DMR"
 msgid "1-4 pick  Hold 2: as APRS"
-msgstr "1-4 choisir  Maint. 2 : APRS"
+msgstr ""
 
 #: core/ui/ui_aprs.c
 msgctxt "DATALINK_HINT"
@@ -3866,6 +3881,11 @@ msgstr ""
 msgctxt "TITLE_EMERGENCY"
 msgid "Emergency"
 msgstr "Urgence"
+
+#: core/ui/ui_menus.c
+msgctxt "KEYFN_VALUE_DATA_SOS"
+msgid "Data link SOS"
+msgstr "SOS liaison données"
 
 #: core/ui/ui_menus.c
 msgctxt "SET_VALUE_UPDOWN_CHANNEL"

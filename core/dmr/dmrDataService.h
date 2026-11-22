@@ -336,6 +336,8 @@ void dmrDataServiceZoneShareRx(uint32_t src, bool group, const uint8_t *payload,
 // The data link (CONFIG_DATALINK_DMR, docs/spec/aprs.md 9.2): a UDP datagram to DMR_UDP_PORT_DATA_LINK for us (or a
 // group we listen to), not left to the PC, not our own. core/aprs/aprs_dlink_dmr.c has it
 void dmrDataServiceDataLinkRx(uint32_t src, bool group, const uint8_t *payload, int length, uint32_t nowMs);
+// ... and every text message the inbox takes, for the KISS host (docs/spec/aprs.md 9.4)
+void dmrDataServiceDataLinkText(uint32_t src, const char *text);
 
 // Control station passthrough (CONFIG_DMR_CONTROL_STATION, docs/spec/usb-network.md 5): while on, IP based packets
 // (SAP 4, SAP 3) to us or our groups are left to the PC on the USB network link: no TMS ACK, no inbox entry, no ARS

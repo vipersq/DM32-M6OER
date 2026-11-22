@@ -147,7 +147,7 @@ static void test_build(void)
 }
 
 // The functions of side key actions 11 (hear all, monitor latch, key lock, call back, home zone)
-// The C4FM fork's functions: numbers 200-203, kept in a slot like the others, each sending its own action
+// The C4FM fork's functions: numbers 200-204, kept in a slot like the others, each sending its own action
 static void test_fork_functions(void)
 {
 	static const uint8_t fn[] = { KEYFN_TACTICAL, KEYFN_TAC_TONES, KEYFN_ROGER, KEYFN_APRS_SEND };
@@ -160,7 +160,14 @@ static void test_fork_functions(void)
 		CHECK(keyassign_get(s, 1, true) == (on ? fn[i] : KEYFN_DEFAULT));
 		CHECK(keyassign_action(fn[i]) == (on ? act[i] : ACT_NONE));
 	}
-	CHECK(!keyassign_allowed(KEYFN_COUNT, false) && !keyassign_allowed(199, true) && !keyassign_allowed(204, true));
+	// 204, the data link's SOS: a long press only (held, so a knock doesn't raise an alert), with the TNC built
+	bool sos = CONFIG_C4FM && CONFIG_APRS_AFSK;
+	uint16_t s2[KEYASSIGN_SLOTS] = { 0 };
+	CHECK(!keyassign_allowed(KEYFN_DATA_SOS, false) && keyassign_allowed(KEYFN_DATA_SOS, true) == sos);
+	keyassign_set(s2, 1, true, KEYFN_DATA_SOS);
+	CHECK(keyassign_get(s2, 1, true) == (sos ? KEYFN_DATA_SOS : KEYFN_DEFAULT));
+	CHECK(keyassign_action(KEYFN_DATA_SOS) == (sos ? ACT_DATA_SOS : ACT_NONE));
+	CHECK(!keyassign_allowed(KEYFN_COUNT, false) && !keyassign_allowed(199, true) && !keyassign_allowed(205, true));
 }
 
 static void test_toggles(void)

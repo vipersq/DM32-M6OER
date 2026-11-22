@@ -115,6 +115,7 @@ typedef struct {
 	uint32_t data_tg;	// over DMR: the talk target the frames go to, 0 none
 	bool data_private;	// ... a private call
 	uint32_t data_sent, data_failed;	// over DMR: frames on air, frames given up
+	bool sos;		// the data link's SOS is on (told to the host)
 	uint8_t pos_src;	// position_src_t in use
 	bool pos_valid;
 	int32_t lat, lon;
@@ -275,7 +276,13 @@ void aprs_host_is_line(const char *line, size_t n, uint32_t now_ms);
 void aprs_host_status_query(void);
 // KISS-encoded bytes for the host: copies up to max, returns the count (0 = nothing waiting)
 size_t aprs_host_output(uint8_t *out, size_t max);
+// The data link's SOS (aprs.md 9.3): SetHardware 'S' and 1 (alert) or 0 (cancelled) to the host, which raises or
+// ends the alert (RadioLink: a 911 Alert in ATAK). false with KISS off: nobody to tell
+bool aprs_host_sos(bool on);
+bool aprs_host_sos_on(void);
 #else
+static inline bool aprs_host_sos(bool on) { (void)on; return false; }
+static inline bool aprs_host_sos_on(void) { return false; }
 static inline bool aprs_host_frame(const uint8_t *frame, size_t n, uint32_t now_ms)
 {
 	(void)frame;
@@ -325,6 +332,10 @@ void aprs_dlink_done(int count, bool sent);
 void aprs_dlink_channel(uint8_t block, uint32_t talk, bool private_call);
 // A frame heard on the data link (any task): to the host as a received KISS frame, nothing else
 void aprs_dlink_rx(const uint8_t *frame, size_t n, uint32_t now_ms);
+// Plain DMR radios to the host in data mode (aprs.md 9.4; any task): a text message heard (to us or a group we listen
+// to), and the host's text to one (aprs_dlink_dmr.c sends it as a DMR text message; false when it can't)
+void aprs_dlink_dmr_text_heard(uint32_t src, const char *text);
+bool aprs_dlink_dmr_text(uint32_t dst, bool group, const char *text, size_t n);
 #endif
 
 #endif

@@ -815,6 +815,26 @@ void aprs_dmr_heard(uint32_t id, const char *alias, int32_t lat, int32_t lon, ui
 	aprs_s.now = now_ms;
 	aprs_station_t *s = station_find(call);
 	bool same = s != NULL && s->has_pos && s->lat == lat && s->lon == lon && now_ms - s->heard_ms < 30000u;
+#if CONFIG_DATALINK_DMR
+	// In data mode the host hears it too (aprs.md 9.4): ID, lat and lon in 1e-7 degrees, the alias
+	if (!same && data_mode()) {
+		uint8_t b[2 + 4 + 8 + 24];
+		size_t k = 0;
+		b[k++] = KISS_TAG_DMR;
+		b[k++] = 'P';
+		const uint32_t w[3] = { id, (uint32_t)lat, (uint32_t)lon };
+		for (int i = 0; i < 3; i++) {
+			b[k++] = (uint8_t)(w[i] >> 24);
+			b[k++] = (uint8_t)(w[i] >> 16);
+			b[k++] = (uint8_t)(w[i] >> 8);
+			b[k++] = (uint8_t)w[i];
+		}
+		for (size_t i = 0; alias != NULL && alias[i] != '\0' && k < sizeof b; i++) {
+			b[k++] = (uint8_t)alias[i];
+		}
+		host_emit(KISS_CMD_SETHW, b, k);
+	}
+#endif
 	if (!same) {
 		s = station_touch(call);
 		s->heard_ms = now_ms;
@@ -1357,7 +1377,10 @@ bool aprs_host_frame(const uint8_t *frame, size_t n, uint32_t now_ms)
 	// (a frequency of the user's own, not the APRS network's) the queue and CSMA are the only limit, and the host
 	// hears the queue's state after each change
 	bool data = aprs_s.cfg.kiss_data;
-	ok = ok && aprs_s.cfg.kiss && aprs_s.me_ok && strcmp(f.src.call, aprs_s.me.call) == 0 &&
+	// Our own frame, or in data mode another station's we relay: our call first in its path, marked as repeated, so
+	// our callsign still identifies the transmission (aprs.md 9)
+	bool relay = ok && data && f.ndigi > 0 && f.digi[0].h && strcmp(f.digi[0].call, aprs_s.me.call) == 0;
+	ok = ok && aprs_s.cfg.kiss && aprs_s.me_ok && (strcmp(f.src.call, aprs_s.me.call) == 0 || relay) &&
 	     (data || aprs_s.host_tokens > 0) &&
 	     (data ? data_block() : freq_block(aprs_cfg_freq(&aprs_s.cfg))) == APRS_OK &&
 	     (dlink_on() ? dlink_queue(frame, n) : queue_raw(K_HOST, frame, n));
@@ -1407,6 +1430,28 @@ size_t aprs_host_output(uint8_t *out, size_t max)
 	}
 	UNLOCK();
 	return n;
+}
+
+bool aprs_host_sos_on(void)
+{
+	LOCK();
+	bool on = aprs_s.v.sos;
+	UNLOCK();
+	return on;
+}
+
+bool aprs_host_sos(bool on)
+{
+	LOCK();
+	bool ok = aprs_s.cfg.kiss;
+	if (ok) {
+		uint8_t b[2] = { KISS_TAG_SOS, on ? 1u : 0u };
+		host_emit(KISS_CMD_SETHW, b, sizeof b);
+		aprs_s.v.sos = on;
+		aprs_changed();
+	}
+	UNLOCK();
+	return ok;
 }
 
 #if CONFIG_DATALINK_DMR
@@ -1482,6 +1527,26 @@ void aprs_dlink_channel(uint8_t block, uint32_t talk, bool private_call)
 		aprs_s.dtalk = talk;
 		aprs_s.dpriv = private_call;
 		aprs_changed();
+	}
+	UNLOCK();
+}
+
+void aprs_dlink_dmr_text_heard(uint32_t src, const char *text)
+{
+	uint8_t b[2 + 4 + 160];
+	size_t k = 0;
+	b[k++] = KISS_TAG_DMR;
+	b[k++] = 'S';
+	b[k++] = (uint8_t)(src >> 24);
+	b[k++] = (uint8_t)(src >> 16);
+	b[k++] = (uint8_t)(src >> 8);
+	b[k++] = (uint8_t)src;
+	for (size_t i = 0; text != NULL && text[i] != '\0' && k < sizeof b; i++) {
+		b[k++] = (uint8_t)text[i];
+	}
+	LOCK();
+	if (data_mode()) {
+		host_emit(KISS_CMD_SETHW, b, k);
 	}
 	UNLOCK();
 }

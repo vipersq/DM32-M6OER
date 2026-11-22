@@ -382,3 +382,5 @@ where it is now (settings.c `fork_record_move`); the stored power levels go back
   (UDP port 4200, compressed header, unconfirmed), and those heard there come back to the host
   ([aprs.md 9.2](aprs.md#92-data-link-over-dmr)). The body names the talkgroup, or says what is missing (a DMR channel
   with a talkgroup, a DMR ID). The status answer's mode is then 3.
+- Relayed frames, the Data link SOS key and plain DMR radios' positions and texts for the host:
+  [aprs.md 9.3, 9.4](aprs.md#93-relayed-frames-and-the-sos-key).
